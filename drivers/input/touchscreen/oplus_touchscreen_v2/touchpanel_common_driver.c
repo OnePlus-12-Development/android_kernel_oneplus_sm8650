@@ -312,6 +312,9 @@ void operate_mode_switch(struct touchpanel_data *ts)
 		if (ts->glove_mode_support || ts->leather_cover_mode_support) {
 			mode_switch_health(ts, MODE_LEATHER_COVER, ts->glove_enable);
 		}
+		if (ts->game_switch_support) {
+			ts->ts_ops->mode_switch(ts->chip_data, MODE_GAME, ts->noise_level);
+		}
 
 		if (ts->charger_pump_support) {
 			mode_switch_health(ts, MODE_CHARGE, ts->is_usb_checked);
