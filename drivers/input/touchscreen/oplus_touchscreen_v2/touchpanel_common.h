@@ -79,6 +79,8 @@
 #define TEST_RUNNING		1
 #define TEST_NOSTART		3
 
+#define KEY_GESTURE_START 246
+
 #define HEALTH_REPORT_GRIP          "grip_report"
 #define HEALTH_REPORT_BASELINE_ERR  "baseline_err"
 #define HEALTH_REPORT_NOISE         "noise_count"
@@ -1064,6 +1066,7 @@ struct touchpanel_data {
 	bool disable_gesture_ctrl;                          /*when lcd_trigger_load_tp_fw start no need to control gesture*/
 	int irq_need_dev_resume_time;                       /*control setting of wait resume time*/
 	int gesture_enable;                                 /*control state of black gesture*/
+	bool double_tap_to_wake_enable;                     /*control state of dt2w*/
 	struct gesture_info    gesture;                     /*gesture related info*/
 	int gesture_enable_indep;                         /*independent control state of black gesture*/
 
