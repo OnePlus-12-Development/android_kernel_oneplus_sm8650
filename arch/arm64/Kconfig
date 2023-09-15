@@ -2305,6 +2305,26 @@ config DMI
 
 endmenu # "Boot options"
 
+# Oplus configuration options
+menu "Oplus configuration options"
+
+config OPLUS_DEVICE_DTBS
+	depends on ARCH_QCOM
+	default n
+	bool "Oplus device DTBs"
+	help
+	  Only include Oplus device specific DTBs to limit the number that
+	  get built during kernel compilation.
+
+config WAFFLE_DTB
+	select OPLUS_DEVICE_DTBS
+	default n
+	bool "Oplus waffle device DTB"
+	help
+	  Only include Oplus waffle device specific device tree.
+
+endmenu
+
 menu "Power management options"
 
 source "kernel/power/Kconfig"
