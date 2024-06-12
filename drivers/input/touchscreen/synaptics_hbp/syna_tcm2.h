@@ -51,7 +51,7 @@
 #else
 #include "../oplus_touchscreen_v2/tp_devices.h"
 #include "../oplus_touchscreen_v2/touchpanel_common.h"
-#include "../touchpanel_notify/touchpanel_event_notify.h"
+#include "../oplus_touchscreen_v2/touchpanel_notify/touchpanel_event_notify.h"
 #endif
 
 #define PLATFORM_DRIVER_NAME "synaptics_tcm_hbp"
