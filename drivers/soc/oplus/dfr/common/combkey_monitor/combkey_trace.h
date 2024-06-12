@@ -35,7 +35,7 @@ TRACE_EVENT(combkey_monitor,
 #endif /* _COMBKEY_TRACE_H */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH drivers/soc/oplus/dfr/common/combkey_monitor
+#define TRACE_INCLUDE_PATH ../combkey_monitor
 
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE combkey_trace

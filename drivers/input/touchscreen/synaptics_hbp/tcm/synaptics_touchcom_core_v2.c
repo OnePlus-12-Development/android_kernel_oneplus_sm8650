@@ -36,7 +36,7 @@
  */
 
 #include "synaptics_touchcom_core_dev.h"
-#include "../touchpanel_healthinfo/touchpanel_healthinfo.h"
+#include "../../oplus_touchscreen_v2/touchpanel_healthinfo/touchpanel_healthinfo.h"
 
 #define BITS_IN_MESSAGE_HEADER (MESSAGE_HEADER_SIZE * 8)
 

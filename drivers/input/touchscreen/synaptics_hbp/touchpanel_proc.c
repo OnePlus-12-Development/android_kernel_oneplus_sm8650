@@ -15,11 +15,7 @@
 #include <linux/rtc.h>
 #include <linux/syscalls.h>
 #include <linux/version.h>
-#ifdef BUILD_BY_BAZEL
-#include <soc/oplus/touchpanel_event_notify.h>/* kernel 6.1 */
-#else
-#include "../touchpanel_notify/touchpanel_event_notify.h"
-#endif
+#include <soc/oplus/touchpanel_event_notify.h>
 #include "touchpanel_healthinfo/touchpanel_healthinfo.h"
 #include "touchpanel_autotest/touchpanel_autotest.h"
 #include "touch_comon_api/touch_comon_api.h"
