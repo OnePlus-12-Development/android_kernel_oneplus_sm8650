@@ -36,7 +36,7 @@
  */
 
 #include "synaptics_touchcom_core_dev.h"
-#include "../touchpanel_healthinfo/touchpanel_healthinfo.h"
+#include "../../oplus_touchscreen_v2/touchpanel_healthinfo/touchpanel_healthinfo.h"
 
 #define TCM_V1_MESSAGE_MARKER 0xa5
 #define TCM_V1_MESSAGE_PADDING 0x5a
