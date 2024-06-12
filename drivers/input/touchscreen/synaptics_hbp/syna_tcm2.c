@@ -57,11 +57,6 @@
 #include "touchpanel_healthinfo/touchpanel_exception.h"
 #define CREATE_TRACE_POINTS
 #include "touchpanel_healthinfo/touchpanel_stats.h"
-#ifdef BUILD_BY_BAZEL
-#include <soc/oplus/touchpanel_event_notify.h>/* kernel 6.1 */
-#else
-#include "../touchpanel_notify/touchpanel_event_notify.h"
-#endif
 #include "touchpanel_autotest/touchpanel_autotest.h"
 #include "touch_comon_api/touch_comon_api.h"
 
@@ -93,6 +88,8 @@
 #include <soc/oplus/system/boot_mode.h>
 #endif
 #endif
+
+#define EVENT_ACTION_UNDER_WATER   0x04
 
 #include <linux/wait.h>
 static DECLARE_WAIT_QUEUE_HEAD(state_waiter);

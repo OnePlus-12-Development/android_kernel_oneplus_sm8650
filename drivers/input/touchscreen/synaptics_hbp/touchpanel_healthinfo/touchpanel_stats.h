@@ -41,7 +41,7 @@ TRACE_EVENT(stats_report,
 #endif /* _TRACE_TOUCH_H */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH  drivers/input/touchscreen/synaptics_hbp/touchpanel_healthinfo
+#define TRACE_INCLUDE_PATH  ../touchpanel_healthinfo
 
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE touchpanel_stats
