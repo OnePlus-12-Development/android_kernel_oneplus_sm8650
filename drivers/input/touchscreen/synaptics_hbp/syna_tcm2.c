@@ -1106,7 +1106,7 @@ static int syna_dev_create_input_device(struct syna_tcm *tcm)
 	input_set_capability(input_dev, EV_KEY, KEY_UNDER_WATER);
 	set_bit(KEY_ON_WATER, input_dev->keybit);
 	input_set_capability(input_dev, EV_KEY, KEY_ON_WATER);
-	for (i = UP_VEE; i <= S_GESTURE; i++) {
+	for (i = DOU_TAP; i <= S_GESTURE; i++) {
 		set_bit(246 + i, input_dev->keybit);
 	}
 #endif
