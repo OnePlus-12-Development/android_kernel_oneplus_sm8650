@@ -751,6 +751,78 @@ static void syna_dev_report_input_events(struct syna_tcm *tcm)
 			LOGD("Gesture detected, id:%d\n",
 				touch_data->gesture_id);
 
+			switch (touch_data->gesture_id) {
+			case CIRCLE_DETECT:
+				touch_data->gesture_type = CIRCLE_GESTURE;
+				break;
+
+			case SWIPE_DETECT:
+				if (touch_data->extra_gesture_info[4] == 0x41) { /*x+*/
+					touch_data->gesture_type = LEFT2RIGHT_SWIP;
+				} else if (touch_data->extra_gesture_info[4] == 0x42) { /*x-*/
+					touch_data->gesture_type = RIGHT2LEFT_SWIP;
+				} else if (touch_data->extra_gesture_info[4] == 0x44) { /*y+*/
+					touch_data->gesture_type = UP2DOWN_SWIP;
+				} else if (touch_data->extra_gesture_info[4] == 0x48) { /*y-*/
+					touch_data->gesture_type = DOWN2UP_SWIP;
+				} else if (touch_data->extra_gesture_info[4] == 0x81) { /*2x-*/
+					touch_data->gesture_type = DOU_SWIP;
+				} else if (touch_data->extra_gesture_info[4] == 0x82) { /*2x+*/
+					touch_data->gesture_type = DOU_SWIP;
+				} else if (touch_data->extra_gesture_info[4] == 0x84) { /*2y+*/
+					touch_data->gesture_type = DOU_SWIP;
+				} else if (touch_data->extra_gesture_info[4] == 0x88) { /*2y-*/
+					touch_data->gesture_type = DOU_SWIP;
+				}
+				break;
+
+			case M_UNICODE:
+				touch_data->gesture_type = M_GESTRUE;
+				break;
+
+			case W_UNICODE:
+				touch_data->gesture_type = W_GESTURE;
+				break;
+
+			case VEE_DETECT:
+				if (touch_data->extra_gesture_info[2] == 0x02) { /*up*/
+					touch_data->gesture_type = UP_VEE;
+				} else if (touch_data->extra_gesture_info[2] == 0x01) { /*down*/
+					touch_data->gesture_type = DOWN_VEE;
+				} else if (touch_data->extra_gesture_info[2] == 0x08) { /*left*/
+					touch_data->gesture_type = LEFT_VEE;
+				} else if (touch_data->extra_gesture_info[2] == 0x04) { /*right*/
+					touch_data->gesture_type = RIGHT_VEE;
+				}
+				break;
+
+			case TOUCH_HOLD_DOWN:
+				touch_data->gesture_type = FINGER_PRINTDOWN;
+				break;
+
+			case TOUCH_HOLD_UP:
+				touch_data->gesture_type = FRINGER_PRINTUP;
+				break;
+
+			case HEART_DETECT:
+				touch_data->gesture_type = HEART;
+				break;
+
+			case STAP_DETECT:
+				touch_data->gesture_type = SINGLE_TAP;
+				break;
+
+			case S_UNICODE:
+				touch_data->gesture_type = S_GESTURE;
+				break;
+
+			case TRIANGLE_DETECT:
+			default:
+				TPD_INFO("not support\n");
+				touch_data->gesture_type = UNKOWN_GESTURE;
+				break;
+			}
+
 			if (touch_data->gesture_id == TOUCH_HOLD_DOWN) {
 				if (!tcm->is_fp_down) {
 					memset(&fp_info, 0, sizeof(struct fp_underscreen_info));
