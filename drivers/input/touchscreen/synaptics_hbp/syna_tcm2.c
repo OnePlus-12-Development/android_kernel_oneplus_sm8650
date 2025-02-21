@@ -825,9 +825,9 @@ static void syna_dev_report_input_events(struct syna_tcm *tcm)
 				input_report_key(input_dev, KEY_WAKEUP, 0);
 				input_sync(input_dev);
 			} else {
-				input_report_key(input_dev, KEY_F4, 1); 
+				input_report_key(input_dev, 246 + touch_data->g_type, 1); 
 				input_sync(input_dev);
-				input_report_key(input_dev, KEY_F4, 0);
+				input_report_key(input_dev, 246 + touch_data->g_type, 0);
 				input_sync(input_dev);
 			}
 		}
@@ -938,7 +938,7 @@ exit:
  */
 static int syna_dev_create_input_device(struct syna_tcm *tcm)
 {
-	int retval = 0;
+	int retval = 0, i = 0;
 	struct tcm_dev *tcm_dev = tcm->tcm_dev;
 	struct input_dev *input_dev = NULL;
 
@@ -995,6 +995,9 @@ static int syna_dev_create_input_device(struct syna_tcm *tcm)
 	input_set_capability(input_dev, EV_KEY, KEY_UNDER_WATER);
 	set_bit(KEY_ON_WATER, input_dev->keybit);
 	input_set_capability(input_dev, EV_KEY, KEY_ON_WATER);
+	for (i = UP_VEE; i <= S_GESTURE; i++) {
+		set_bit(246 + i, input_dev->keybit);
+	}
 #endif
 
 	input_set_abs_params(input_dev,
