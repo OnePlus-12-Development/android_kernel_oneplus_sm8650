@@ -88,6 +88,7 @@ enum gesture_classification {
 #define UNDER_WATER     0x85
 #define ON_WATER        0x86
 
+#define KEY_GESTURE_START 246
 
 #define UNKOWN_GESTURE		0
 #define DOU_TAP			1   /* double tap*/
