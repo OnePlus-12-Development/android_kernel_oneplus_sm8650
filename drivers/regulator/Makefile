@@ -199,4 +199,6 @@ obj-$(CONFIG_REGULATOR_DEBUG_CONTROL) += debug-regulator.o
 obj-$(CONFIG_REGULATOR_QTI_OCP_NOTIFIER) += qti-ocp-notifier.o
 obj-$(CONFIG_VIRTIO_REGULATOR) += virtio_regulator.o
 obj-$(CONFIG_REGULATOR_SPM) += spm-regulator.o
+obj-$(CONFIG_OPLUS_CAMERA_AW37004) += camera_aw37004/
+
 ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
