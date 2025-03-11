@@ -1367,6 +1367,9 @@ config TOUCHSCREEN_IQS5XX
 	  To compile this driver as a module, choose M here: the
 	  module will be called iqs5xx.
 
+source "drivers/input/touchscreen/touch_custom/Kconfig"
+source "drivers/input/touchscreen/oplus_touchscreen_v2/Kconfig"
+
 config TOUCHSCREEN_ZINITIX
 	tristate "Zinitix touchscreen support"
 	depends on I2C
@@ -1379,4 +1382,5 @@ config TOUCHSCREEN_ZINITIX
 	  To compile this driver as a module, choose M here: the
 	  module will be called zinitix.
 
+source "drivers/input/touchscreen/synaptics_hbp/Kconfig"
 endif
