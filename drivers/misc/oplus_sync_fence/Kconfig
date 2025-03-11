@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2020-2022 Oplus. All rights reserved.
+
+config OPLUS_SYNC_FENCE
+        tristate "oplus sync fence"
+        help
+          To compile this driver as a module, set m in kernel build config
+          module will be called oplus_sync_fence.

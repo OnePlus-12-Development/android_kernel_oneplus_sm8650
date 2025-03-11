@@ -531,6 +531,51 @@ config KINECTICS_XR_NORDIC
 	   this also parses the gpios and interrupts from device tree and sets
 	   the gpios and interrupt handler for handling the interrupt.
 
+#ifdef OPLUS_FEATURE_RF_CABLE_DETECT
+config OPLUS_RF_CABLE_MONITOR
+	tristate "OPLUS rf cable monitor system"
+	depends on OF
+	select PINMUX
+	default n
+	help
+	  Say Y here to enable OPLUS rf cable monitor system support
+#endif /* OPLUS_FEATURE_RF_CABLE_DETECT */
+
+#ifdef OPLUS_FEATURE_SIM_DETECT
+config SIM_DETECT
+	tristate "SIM_DETECT system"
+	default n
+	help
+	  Say Y here to enable sim detect system support
+#endif /* OPLUS_FEATURE_SIM_DETECT */
+ 
+#ifdef OPLUS_FEATURE_SIM_DETECT
+config OEM_QMI
+	tristate "oem qmi feature"
+	default n
+	help
+	  Say Y here to enable oem qmi support
+#endif /* OPLUS_FEATURE_SIM_DETECT */
+ 
+#change 'y' to 'n', if you want fo close this controller
+config OPLUS_GPIO
+    tristate "oplus gpio controller"
+    default n
+    help
+      define this config to control oplus gpio.
+ 
+#ifdef OPLUS_FEATURE_CHG_BASIC
+config HAPTIC_FEEDBACK
+	tristate "Haptic driver feedback"
+	help
+	  This option enables support for Haptic Driver Feedback.
+
+config OPLUS_VIBRATOR_GKI_ENABLE
+	tristate "vibrator compatibility"
+	help
+	  This option enables support for vibrator compatibility.
+#endif
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
@@ -549,4 +594,10 @@ source "drivers/misc/habanalabs/Kconfig"
 source "drivers/misc/uacce/Kconfig"
 source "drivers/misc/pvpanic/Kconfig"
 source "drivers/misc/mchp_pci1xxxx/Kconfig"
+source "drivers/misc/vibrator/aw8697_haptic/Kconfig"
+source "drivers/misc/vibrator/si_haptic/Kconfig"
+source "drivers/misc/oplus_power_notifier/Kconfig"
+source "drivers/misc/tri_state_key/Kconfig"
+source "drivers/misc/oplus_consumer_ir/Kconfig"
+source "drivers/misc/oplus_sync_fence/Kconfig"
 endmenu
