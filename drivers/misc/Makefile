@@ -70,16 +70,18 @@ obj-$(CONFIG_KINECTICS_XR_NORDIC) += kxrctrl/
 obj-y	+= tri_state_key/
 
 #ifdef OPLUS_FEATURE_RF_CABLE_DETECT
-oplus_bsp_rfcablemonitor-y           := oplus_rf_cable_monitor.o
-obj-$(CONFIG_OPLUS_RF_CABLE_MONITOR)   += oplus_bsp_rfcablemonitor.o
+oplus_network_rf_cable_monitor-y           := oplus_rf_cable_monitor.o
+obj-$(CONFIG_OPLUS_RF_CABLE_MONITOR)   += oplus_network_rf_cable_monitor.o
 #endif /* OPLUS_FEATURE_RF_CABLE_DETECT */
 
 #ifdef OPLUS_FEATURE_SIM_DETECT
-obj-$(CONFIG_SIM_DETECT)	+= sim_detect.o
+oplus_network_sim_detect-y := sim_detect.o
+obj-$(CONFIG_SIM_DETECT)	+= oplus_network_sim_detect.o
 #endif
 
 #ifdef OPLUS_FEATURE_SIM_DETECT
-obj-$(CONFIG_OEM_QMI)	+= oem_qmi_client.o
+oplus_network_oem_qmi-y := oem_qmi_client.o
+obj-$(CONFIG_OEM_QMI)	+= oplus_network_oem_qmi.o
 #endif
 
 obj-$(CONFIG_OPLUS_GPIO) += oplus_network_esim.o
