@@ -12,3 +12,6 @@ oplus_phoenix-y := op_bootprof.o phoenix_dump.o phoenix_watchdog.o phoenix_base.
 endif #CONFIG_OPLUS_SYSTEM_KERNEL_QCOM
 obj-$(CONFIG_OPLUS_FEATURE_KMSG_WB) += oplus_bsp_dfr_kmsg_wb.o
 oplus_bsp_dfr_kmsg_wb-y += oplus_kmsg_wb.o
+
+obj-m += oplus_bsp_dfr_shutdown_speed.o
+oplus_bsp_dfr_shutdown_speed-y += shutdown_speed.o
