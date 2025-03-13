@@ -7629,21 +7629,29 @@ static void syna_tcm_tp_shutdown(struct i2c_client *client)
 	tp_shutdown(ts);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+static void syna_tcm_remove(struct i2c_client *client)
+#else
 static int syna_tcm_remove(struct i2c_client *client)
+#endif
 {
 	struct touchpanel_data *ts = NULL;
 	struct syna_tcm_data *tcm_info = NULL;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0))
 	if (!client) {
 		TPD_INFO("%s client is NULL\n", __func__);
 		return -1;
 	}
+#endif
 
 	ts = i2c_get_clientdata(client);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0))
 	if (!ts) {
 		TPD_INFO("%s ts is NULL\n", __func__);
 		return -1;
 	}
+#endif
 
 	tcm_info = (struct syna_tcm_data *)ts->chip_data;
 
@@ -7666,7 +7674,10 @@ static int syna_tcm_remove(struct i2c_client *client)
 	tp_kfree((void **)&tcm_info);
 	i2c_set_clientdata(client, NULL);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+#else
 	return 0;
+#endif
 }
 
 static int syna_i2c_suspend(struct device *dev)
