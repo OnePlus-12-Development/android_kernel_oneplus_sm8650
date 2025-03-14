@@ -94,3 +94,7 @@ obj-$(CONFIG_OPLUS_POWER_NOTIFIER) += oplus_power_notifier/
 #ifdef CONFIG_OPLUS_SENSOR_CONSUMER_IR
 obj-$(CONFIG_OPLUS_SENSOR_CONSUMER_IR_CORE) += oplus_consumer_ir/
 #endif /* CONFIG_OPLUS_SENSOR_CONSUMER_IR */
+
+#ifdef CONFIG_OPLUS_SYNC_FENCE
+obj-$(CONFIG_OPLUS_SYNC_FENCE) += oplus_sync_fence/
+#endif /* CONFIG_OPLUS_SYNC_FENCE */
