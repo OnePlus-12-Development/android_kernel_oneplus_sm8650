@@ -80,7 +80,8 @@ obj-$(CONFIG_SIM_DETECT)	+= oplus_network_sim_detect.o
 #endif
 
 #ifdef OPLUS_FEATURE_SIM_DETECT
-obj-$(CONFIG_OEM_QMI)	+= oem_qmi_client.o
+oplus_network_oem_qmi-y := oem_qmi_client.o
+obj-$(CONFIG_OEM_QMI)	+= oplus_network_oem_qmi.o
 #endif
 
 obj-$(CONFIG_OPLUS_GPIO) += oplus_network_esim.o
@@ -98,3 +99,18 @@ obj-$(CONFIG_OPLUS_SENSOR_CONSUMER_IR_CORE) += oplus_consumer_ir/
 #ifdef CONFIG_OPLUS_SYNC_FENCE
 obj-$(CONFIG_OPLUS_SYNC_FENCE) += oplus_sync_fence/
 #endif /* CONFIG_OPLUS_SYNC_FENCE */
+
+obj-$(CONFIG_OPLUS_FEATURE_DATA_MODULE) += data_module/
+
+obj-$(CONFIG_OPLUS_FEATURE_DNS_HOOK) += oplus_dns_hook/
+
+obj-$(CONFIG_OPLUS_FEATURE_APP_MONITOR) += oplus_apps_monitor/
+
+obj-y += oplus_network_tuning/
+
+obj-$(CONFIG_OPLUS_FEATURE_DATA_EVAL) += oplus_score/
+obj-$(CONFIG_OPLUS_FEATURE_ESTABLISH_REPORT) += oplus_socket_stats_report/
+obj-$(CONFIG_OPLUS_FEATURE_STATS_CALC) += oplus_stats_calc/
+obj-$(CONFIG_OPLUS_FEATURE_VIRTUAL_NET) += oplus_vnet/
+obj-y += linkpower_module/
+obj-y += oplus_game_first/

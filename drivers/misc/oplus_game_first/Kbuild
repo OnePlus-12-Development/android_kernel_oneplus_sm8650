@@ -1,0 +1,2 @@
+obj-m += oplus_network_game_first.o
+oplus_network_game_first-y += oplus_game_first.o
