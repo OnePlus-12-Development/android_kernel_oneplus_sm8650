@@ -371,6 +371,9 @@ bool is_page_owner_enabled(void)
 	return false;
 
 }
+#endif
+
+static int nr_slab_owner_handles;
 
 static bool found_stack(depot_stack_handle_t handle,
 		 char *dump_addr, size_t dump_size,
@@ -394,6 +397,7 @@ static bool found_stack(depot_stack_handle_t handle,
 	return false;
 }
 
+#ifdef CONFIG_PAGE_OWNER
 static bool check_unaccounted(char *buf, ssize_t count,
 		struct page *page, depot_stack_handle_t handle)
 {
