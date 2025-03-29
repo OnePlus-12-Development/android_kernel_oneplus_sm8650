@@ -26,7 +26,8 @@ the free (trimmed) area as needed in such a way as they can be restored.
 However, the writes, with one exception, then happen exactly as they would
 without dm_bow, so the device is always in a good final state. The exception is
 that sector 0 is used to keep a log of the latest changes, both to indicate that
-we are in this state and to allow rollback. See below for all details.
+we are in this state and to allow rollback. See below for all details. If there
+isn't enough free space, writes are failed with -ENOSPC.
 
 State 2: The transition to state 2 triggers replacing the special sector 0 with
 the normal sector 0, and the freeing of all state information. dm_bow then
