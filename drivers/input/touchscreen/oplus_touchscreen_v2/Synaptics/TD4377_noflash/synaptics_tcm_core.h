@@ -158,6 +158,8 @@ enum test_item_bit {
 	TYPE_PT11 				= 11,
 	TYPE_DYNAMIC_RANGE_DOZE = 14,
 	TYPE_NOISE_DOZE			= 15,
+	TYPE_PT17 				= 17,
+	TYPE_PT18 				= 18,
 	TYPE_HYBRIDRAW_CAP      = 18,
 	TYPE_RAW_CAP            = 22,
 	TYPE_TREXSHORT_CUSTOM   = 25,
@@ -576,6 +578,7 @@ struct syna_tcm_hcd {
 	bool irq_trigger_hdl_support;
 	bool health_monitor_support;
 	bool health_monitor_v2_support;
+	bool pt17_pt18_test_support;
 };
 
 struct device_hcd {

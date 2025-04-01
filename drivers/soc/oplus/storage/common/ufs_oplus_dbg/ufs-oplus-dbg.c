@@ -1156,7 +1156,7 @@ static void ufs_oplus_ioctl_init(struct scsi_device *sdev) {
 }
 
 void ufs_oplus_init_sdev(struct scsi_device *sdev) {
-	if ((0 == strncmp(sdev->vendor, "XBSTOR ", 7) && scsi_is_wlun(sdev->lun)))
+	if (scsi_is_wlun(sdev->lun))
             return;
 
 	if (atomic_inc_return(&ufs_init_done) == 1) {

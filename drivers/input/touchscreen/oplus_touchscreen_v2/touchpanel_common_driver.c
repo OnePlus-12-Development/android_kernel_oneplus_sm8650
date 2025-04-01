@@ -245,6 +245,7 @@ int mode_switch_health(struct touchpanel_data *ts, work_mode mode, int flag)
 			   (MODE_HEADSET == mode) ? "mode_headset_switch_fail" :
 			   (MODE_WIRELESS_CHARGE == mode) ? "mode_wireless_charge_switch_fail" :
 			   (MODE_PEN_SCAN == mode) ? "mode_pen_scan_switch_fail" :
+			   (MODE_INCELL_AOD == mode) ? "mode_incell_aod_switch_fail" :
 			   (MODE_PEN_CTL == mode) ? "mode_pen_ctl_switch_fail" : "mode_others_switch_fail");
 	}
 
@@ -298,7 +299,20 @@ void operate_mode_switch(struct touchpanel_data *ts)
 		}
 
 		if (ts->black_gesture_support) {
-			mode_switch_health(ts, MODE_GESTURE, false);
+			if (ts->incell_aod_gesture_support) {
+				TP_INFO(ts->tp_index, "%s : incell_aod_flag = %d", __func__, ts->incell_aod_flag);
+				if (ts->incell_aod_flag) {
+					TP_INFO(ts->tp_index, "TP in mode aod start\n");
+					ts->is_suspended = 1;
+					ts->incell_aod_flag = false;
+					mode_switch_health(ts,  MODE_INCELL_AOD, true);
+				} else {
+					TP_INFO(ts->tp_index, "TP out mode aod start\n");
+					mode_switch_health(ts,  MODE_INCELL_AOD, false);
+				}
+			} else {
+				mode_switch_health(ts, MODE_GESTURE, false);
+			}
 		}
 
 		if (ts->fw_edge_limit_support) {
@@ -558,6 +572,11 @@ static inline void tp_touch_down(struct touchpanel_data *ts, struct point_info p
 	}
 	ts->last_x_y_point[id].x = points.x;
 	ts->last_x_y_point[id].y = points.y;
+
+	if (id == 0 && ts->report_rate_testing) {
+		ts->touch_major_sum += points.touch_major;
+		ts->get_frame_num++;
+	}
 
 	TP_SPECIFIC_PRINT(ts->tp_index, ts->point_num, "Touchpanel id %d :Down[%4d %4d %4d %4d %4d %4d %4d] %d\n", id, points.x, points.y, points.z,
 						points.rx_press, points.tx_press, points.rx_er, points.tx_er, cost_time);
@@ -893,6 +912,8 @@ static inline void tp_touch_handle(struct touchpanel_data *ts)
 	int obj_attention = 0;
 	int retval = 0;
 	struct point_info points[MAX_FINGER_NUM];
+	int down_time_set = 0;
+	u64 delta_kernel_time = 0;
 
 	if (((!ts->ts_ops->get_touch_points) && (!ts->enable_point_auto_change))
 	    || ((!ts->ts_ops->get_touch_points_auto) && ts->enable_point_auto_change)) {
@@ -989,6 +1010,22 @@ static inline void tp_touch_handle(struct touchpanel_data *ts)
 				if (retval < 0) {
 					TP_INFO(ts->tp_index, "tp_memcpy failed.\n");
 				}
+				if ((down_time_set == 0) && (ts->max_report_rate_limit)) {
+					ts->touch_frame_num++;
+					down_time_set = 1;
+					if (ts->touch_frame_num == 1) {
+						ts->touch_down_time = ktime_to_ms(ktime_get());
+					} else if (ts->touch_frame_num == (MAX_REPORT_FRAME_TEST_FRAME + 1)) {
+						delta_kernel_time = ktime_to_ms(ktime_get()) - ts->touch_down_time;
+						if (((1000 * MAX_REPORT_FRAME_TEST_FRAME) / delta_kernel_time) > ts->max_report_rate_limit) {
+							TP_INFO(ts->tp_index, "tp report rate error. rate_rate:%llu, limit:%u \n", \
+									((1000 * MAX_REPORT_FRAME_TEST_FRAME) / delta_kernel_time), ts->max_report_rate_limit);
+							if (ts->health_monitor_support) {
+								tp_healthinfo_report(&ts->monitor_data, HEALTH_REPORT, "report_rate_error");
+							}
+						}
+					}
+				}
 			}
 			else {
 				input_mt_slot(ts->input_dev, i);
@@ -1019,6 +1056,7 @@ static inline void tp_touch_handle(struct touchpanel_data *ts)
 		ts->total_operate_times++;
 		finger_num = 0;
 		finger_num_center = 0;
+		ts->touch_frame_num = 0;
 		ts->touch_report_num = 0;
 		ts->tp_ic_touch_num = 0;
 		ts->last_tp_ic_touch_num = 0;
@@ -2321,7 +2359,8 @@ static int init_parse_dts(struct device *dev, struct touchpanel_data *ts)
 	if (!ts->sportify_aod_gesture_support) {
 		TP_INFO(ts->tp_index, "not support sportify_aod_gesture\n");
 	}
-
+	ts->incell_aod_gesture_support = of_property_read_bool(np,
+						 "incell_aod_gesture_support");
 	ts->regulator_count_not_support = of_property_read_bool(np, "regulator_count_not_support");
 
 	ts->force_bus_ready_support = of_property_read_bool(np, "force_bus_ready_support");
@@ -2336,6 +2375,7 @@ static int init_parse_dts(struct device *dev, struct touchpanel_data *ts)
 	ts->pen_support = of_property_read_bool(np, "pen_support");
 	ts->pen_support_opp = of_property_read_bool(np, "pen_support_opp");
 	ts->bus_ready_check_support = of_property_read_bool(np, "bus_ready_check_support");
+	ts->aiunit_game_info_support = of_property_read_bool(np, "aiunit_game_info_support");
 	TP_INFO(ts->tp_index, "bus_ready_check_support is %d\n", ts->bus_ready_check_support);
 
 	ts->tp_lcd_suspend_in_lp_support = of_property_read_bool(np, "tp_lcd_suspend_in_lp_support");
@@ -2623,6 +2663,13 @@ static int init_parse_dts(struct device *dev, struct touchpanel_data *ts)
 	} else if (rc) {
 		TP_BOOT_INFO(ts->tp_index, "now has %d num panel in dts\n", rc);
 		ts->panel_data.panel_num = rc;
+	}
+	/*tp max report rate limit*/
+	rc = of_property_read_u32(np, "max_report_rate_limit", &ts->max_report_rate_limit);
+
+	if (rc) {
+		TP_BOOT_INFO(ts->tp_index, "max report rate not limit\n");
+		ts->max_report_rate_limit = 0;
 	}
 
 	if (ts->panel_data.panel_num > 0) {
@@ -2995,6 +3042,13 @@ static int init_parse_dts(struct device *dev, struct touchpanel_data *ts)
 	}
 	else {
 		TPD_BOOT_INFO("touch_environment:%s\n", ts->touch_environment);
+	}
+
+	rc = of_property_read_u32(np, "touchpanel,aiunit_game_valid_bits", &ts->aiunit_game_valid_bits);
+
+	if (rc) {
+		TP_BOOT_INFO(ts->tp_index, "tp aiunit game valid bits not specified\n");
+		ts->aiunit_game_valid_bits = 19;
 	}
 
 	init_panel_config(dev, ts);
@@ -4243,6 +4297,7 @@ int register_common_touch_device(struct touchpanel_data *pdata)
 	ts->gesture_enable = 1;
 	ts->fd_enable = 0;
 	ts->fp_enable = 0;
+	ts->aiunit_game_enable = 0;
 	ts->fp_info.touch_state = 0;
 	ts->palm_enable = 1;
 	ts->touch_count = 0;
@@ -4257,6 +4312,9 @@ int register_common_touch_device(struct touchpanel_data *pdata)
 	ts->palm_to_sleep_enable = 0;
 	ts->tp_ic_touch_num = 0;
 	ts->last_tp_ic_touch_num = 0;
+	ts->report_rate_testing = false;
+	ts->report_rate_test_time = 5;
+	ts->touch_frame_num = 0;
 	for (i = 0; i < MAX_FINGER_NUM; i++) {
 		ts->last_x_y_point[i].x = 0;
 		ts->last_x_y_point[i].y = 0;
@@ -4705,7 +4763,11 @@ static void tp_resume(struct device *dev)
 
 	if (!ts->is_suspended) {
 		TP_INFO(ts->tp_index, "%s: do not resume twice.\n", __func__);
-		goto NO_NEED_RESUME;
+		if (ts->incell_aod_gesture_support) {
+			ts->incell_aod_flag = false;
+		} else {
+			goto NO_NEED_RESUME;
+		}
 	}
 
 	touchpanel_trusted_touch_completion(ts);
@@ -4977,6 +5039,8 @@ static void lcd_other_event(int *blank, struct touchpanel_data *ts)
 		tp_control_irq_state(1, ts->tp_index);
 	} else if (*blank == LCD_CTL_IRQ_OFF) {
 		tp_control_irq_state(0, ts->tp_index);
+	} else if (*blank == LCD_CTL_AOD_OFF) {
+		ts->incell_aod_flag = false;
 	}
 };
 
@@ -5075,6 +5139,9 @@ static int ts_mtk_drm_notifier_callback(struct notifier_block *nb,
 			}
 			lcd_on_early_event(ts);
 		} else if (*blank == MTK_DISP_BLANK_POWERDOWN) {
+			if (ts->incell_aod_gesture_support) {
+				ts->is_suspended = 0;
+			}
 			if (ts->speedup_resume_wq) {
 				flush_workqueue(ts->speedup_resume_wq);		/*wait speedup_resume_wq done*/
 			}
@@ -5086,6 +5153,8 @@ static int ts_mtk_drm_notifier_callback(struct notifier_block *nb,
 			lcd_on_event(ts);
 		} else if (*blank == MTK_DISP_BLANK_POWERDOWN) {
 			lcd_off_event(ts);
+		} else if (*blank == LCD_CTL_AOD_ON) {
+			ts->incell_aod_flag = true;
 		}
 	break;
 	default:

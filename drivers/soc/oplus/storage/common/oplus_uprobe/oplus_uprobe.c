@@ -407,16 +407,18 @@ process_fetch_insn(struct fetch_insn *code, void *rec, void *dest,
 			return -EINVAL;
 		}
 
-		offset = oplus_regs_query_register_offset(reg);
-		pr_storage(OPLUS_UPROBE_LOG_TAG"oplus_parse_arg 2 reg(%s) offset(%d) regval(0x%llx)\n", reg, offset, set_val);
+		offset = (unsigned int)oplus_regs_query_register_offset(reg);
 		if (offset < 0) {
+			pr_storage(OPLUS_UPROBE_LOG_TAG"oplus_parse_arg 2 reg(%s) offset(%d) regval(0x%llx)\n", reg, offset, set_val);
 			pr_err(OPLUS_UPROBE_LOG_TAG "parse register failed\n");
+			kfree(reg_string);
 			return -EINVAL;
+		} else if (offset >= 0) {
+			offset >>= 3;
+			pt_regs_write_reg(regs, offset, (unsigned long)set_val);
+			pr_storage(OPLUS_UPROBE_LOG_TAG "FETCH_OP_MOD_BF offset(%d) set_val(0x%llx)\n", offset, set_val);
 		}
 
-		offset >>= 3;
-		pr_storage(OPLUS_UPROBE_LOG_TAG "FETCH_OP_MOD_BF offset(%d) set_val(0x%llx)\n", offset, set_val);
-		pt_regs_write_reg(regs, offset, (unsigned long)set_val);
 		kfree(reg_string);
 		break;
 	case FETCH_OP_DATA:

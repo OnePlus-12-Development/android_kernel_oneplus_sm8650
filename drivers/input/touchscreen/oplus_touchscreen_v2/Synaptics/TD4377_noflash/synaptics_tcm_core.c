@@ -1976,7 +1976,7 @@ retry:
 #endif
 
 	UNLOCK_BUFFER(tcm_hcd->in);
-
+	usleep_range(5, 10);
 	retval = syna_tcm_continued_read(tcm_hcd);
 	if (retval < 0) {
 		TPD_INFO("Failed to do continued read\n");
@@ -3460,7 +3460,7 @@ static int syna_tcm_async_work(void *chip_data)
 	return 0;
 }*/
 
-static void copy_fw_to_buffer(struct syna_tcm_hcd *tcm_hcd, const struct firmware *fw)
+static fw_update_state copy_fw_to_buffer(struct syna_tcm_hcd *tcm_hcd, const struct firmware *fw)
 {
 	struct firmware *tp_fw;
 	if (fw) {
@@ -3491,13 +3491,15 @@ static void copy_fw_to_buffer(struct syna_tcm_hcd *tcm_hcd, const struct firmwar
 	}
 	else {
 		TPD_INFO("failed to get oplus tp firmware.\n");
+		return FW_UPDATE_ERROR;
 	}
-	return;
+	return FW_UPDATE_ERROR;
 
 exit:
 	if(tp_fw) {
 		vfree(tp_fw);
 	}
+	return FW_UPDATE_ERROR;
 }
 
 extern int try_to_recovery_ic(struct syna_tcm_hcd *tcm_hcd, char *iHex);
@@ -3508,7 +3510,7 @@ static fw_update_state syna_tcm_fw_update(void *chip_data, const struct firmware
 	struct syna_tcm_hcd *tcm_hcd = (struct syna_tcm_hcd *)chip_data;
 	TPD_DEBUG("syna_tcm_fw_update begin\n");
 
-	copy_fw_to_buffer(tcm_hcd, fw);
+	ret = copy_fw_to_buffer(tcm_hcd, fw);
 	tcm_hcd->tp_fw_update_parse = true;
 
 	syna_reset_gpio(tcm_hcd, false);
@@ -4063,6 +4065,206 @@ static int syna_testing_pt11(struct seq_file *s, void *chip_data,
 	return error_count;
 }
 
+static int syna_get_test_max_adc_value(struct syna_tcm_hcd *tcm_hcd, unsigned short *value)
+{
+	int retval;
+	unsigned char out_buf;
+	unsigned char *resp_buf;
+	unsigned int resp_buf_size;
+	unsigned int resp_length;
+
+	resp_buf = NULL;
+	resp_buf_size = 0;
+	out_buf = (unsigned char)0xa5;
+
+	retval = syna_tcm_write_message(tcm_hcd,
+					CMD_PRODUCTION_TEST,
+					&out_buf,
+					sizeof(out_buf),
+					&resp_buf,
+					&resp_buf_size,
+					&resp_length,
+					RESPONSE_TIMEOUT_MS_SHORT);
+	if (retval < 0 || resp_length < 2) {
+		retval = -EINVAL;
+		TPD_INFO("Failed to read test max adc value\n");
+		goto exit;
+	}
+
+	*value = (unsigned short)le2_to_uint(resp_buf);
+exit:
+	kfree(resp_buf);
+	return retval;
+}
+
+static int syna_testing_pt17(struct seq_file *s, void *chip_data,
+				  struct auto_testdata *syna_testdata, struct test_item_info *p_test_item_info)
+{
+	int16_t data16 = 0;
+	int i = 0, ret = 0, index = 0, byte_cnt = 2;
+	int error_count = 0;
+	struct syna_tcm_hcd *tcm_info = (struct syna_tcm_hcd *)chip_data;
+	struct auto_test_item_header *item_header = NULL;
+	int32_t *p_mutual_p = NULL, *p_mutual_n = NULL;
+	struct syna_tcm_test *test_hcd = tcm_info->test_hcd;
+	unsigned char *buf = NULL;
+	unsigned short  max_adc_value = 0;
+
+	item_header = (struct auto_test_item_header *)(syna_testdata->fw->data + p_test_item_info->item_offset);
+	if (item_header->item_limit_type == LIMIT_TYPE_TX_RX_DATA) {
+		p_mutual_p = (int32_t *)(syna_testdata->fw->data + item_header->top_limit_offset);
+		p_mutual_n = (int32_t *)(syna_testdata->fw->data + item_header->floor_limit_offset);
+	} else {
+		TPD_INFO("raw cap test limit type(%2x) is wrong.\n",
+		item_header->item_limit_type);
+
+		error_count++;
+		return error_count;
+	}
+
+	ret = syna_get_test_max_adc_value(tcm_info, &max_adc_value);
+	if (ret < 0) {
+		TPD_INFO("syna_get_test_max_adc_value failed.\n");
+
+		error_count++;
+		return error_count;
+	}
+
+	if (max_adc_value == 0) {
+		TPD_INFO("wrong max adc value:%d\n", max_adc_value);
+
+		error_count++;
+		return error_count;
+	}
+
+	ret = testing_run_prod_test_item(tcm_info, TYPE_PT17);
+
+	if (ret < 0) {
+		TPD_INFO("run raw cap test failed.\n");
+
+		error_count++;
+		return error_count;
+	}
+
+	LOCK_BUFFER(test_hcd->test_resp);
+	buf = test_hcd->test_resp.buf;
+	TPD_INFO("%s read data size:%d\n", __func__, test_hcd->test_resp.data_length);
+	store_to_file(syna_testdata->fp, syna_testdata->length,
+			syna_testdata->pos, "pt17:");
+
+	for (i = 0; i < test_hcd->test_resp.data_length;) {
+		index = i / byte_cnt;
+		data16 = (buf[i] | (buf[i + 1] << 8));
+		data16 =((unsigned int)data16 * 200)/ max_adc_value;
+
+		if (0 == index % (syna_testdata->rx_num))
+			store_to_file(syna_testdata->fp, syna_testdata->length,
+				syna_testdata->pos, "\n");
+
+		store_to_file(syna_testdata->fp, syna_testdata->length,
+			syna_testdata->pos, "%04d, ", data16);
+
+		if ((data16 < p_mutual_n[index]) || (data16 > p_mutual_p[index])) {
+			TPD_INFO("rawcap test failed at node[%d]=%d [%d %d].\n", index, data16,
+				p_mutual_n[index], p_mutual_p[index]);
+
+			error_count++;
+		}
+
+		i += byte_cnt;
+	}
+
+	UNLOCK_BUFFER(test_hcd->test_resp);
+	store_to_file(syna_testdata->fp, syna_testdata->length,
+		syna_testdata->pos, "\n");
+
+	return error_count;
+}
+
+static int syna_testing_pt18(struct seq_file *s, void *chip_data,
+				  struct auto_testdata *syna_testdata, struct test_item_info *p_test_item_info)
+{
+	int16_t data16 = 0;
+	int i = 0, ret = 0, index = 0, byte_cnt = 2;
+	int error_count = 0;
+	struct syna_tcm_hcd *tcm_info = (struct syna_tcm_hcd *)chip_data;
+	struct auto_test_item_header *item_header = NULL;
+	int32_t *p_mutual_p = NULL, *p_mutual_n = NULL;
+	struct syna_tcm_test *test_hcd = tcm_info->test_hcd;
+	unsigned char *buf = NULL;
+	unsigned short  max_adc_value = 0;
+
+	item_header = (struct auto_test_item_header *)(syna_testdata->fw->data + p_test_item_info->item_offset);
+	if (item_header->item_limit_type == LIMIT_TYPE_TX_RX_DATA) {
+		p_mutual_p = (int32_t *)(syna_testdata->fw->data + item_header->top_limit_offset);
+		p_mutual_n = (int32_t *)(syna_testdata->fw->data + item_header->floor_limit_offset);
+	} else {
+		TPD_INFO("raw cap test limit type(%2x) is wrong.\n",
+		item_header->item_limit_type);
+
+		error_count++;
+		return error_count;
+	}
+
+	ret = syna_get_test_max_adc_value(tcm_info, &max_adc_value);
+	if (ret < 0) {
+		TPD_INFO("syna_get_test_max_adc_value failed.\n");
+
+		error_count++;
+		return error_count;
+	}
+	if (max_adc_value == 0) {
+		TPD_INFO("wrong max adc value:%d\n", max_adc_value);
+
+		error_count++;
+		return error_count;
+	}
+
+	ret = testing_run_prod_test_item(tcm_info, TYPE_PT18);
+
+	if (ret < 0) {
+		TPD_INFO("run raw cap test failed.\n");
+
+		error_count++;
+		return error_count;
+	}
+
+	LOCK_BUFFER(test_hcd->test_resp);
+	buf = test_hcd->test_resp.buf;
+	TPD_INFO("%s read data size:%d\n", __func__, test_hcd->test_resp.data_length);
+	store_to_file(syna_testdata->fp, syna_testdata->length,
+			syna_testdata->pos, "pt18:");
+
+	for (i = 0; i < test_hcd->test_resp.data_length;) {
+		index = i / byte_cnt;
+		data16 = (buf[i] | (buf[i + 1] << 8));
+		data16 =((unsigned int)data16 * 200)/ max_adc_value;
+		if (0 == index % (syna_testdata->rx_num))
+			store_to_file(syna_testdata->fp, syna_testdata->length,
+				syna_testdata->pos, "\n");
+
+		store_to_file(syna_testdata->fp, syna_testdata->length,
+			syna_testdata->pos, "%04d, ", data16);
+
+		if ((data16 < p_mutual_n[index]) || (data16 > p_mutual_p[index])) {
+			TPD_INFO("rawcap test failed at node[%d]=%d [%d %d].\n", index, data16,
+				p_mutual_n[index], p_mutual_p[index]);
+
+		error_count++;
+		}
+
+		i += byte_cnt;
+	}
+
+	UNLOCK_BUFFER(test_hcd->test_resp);
+	store_to_file(syna_testdata->fp, syna_testdata->length,
+		syna_testdata->pos, "\n");
+
+	msleep(100);
+
+	return error_count;
+}
+
 static int syna_testing_Doze_noise(struct seq_file *s, void *chip_data,
 					struct auto_testdata *syna_testdata, struct test_item_info *p_test_item_info)
 {
@@ -4602,6 +4804,23 @@ static struct syna_auto_test_operations synaptics_test_ops = {
 	.syna_auto_black_screen_test_endoperation  =  synaptics_auto_black_screen_test_endoperation,
 };
 
+static struct syna_auto_test_operations synaptics_test_ops2 = {
+	.test1       =  syna_testing_noise,
+	.test2       =  syna_testing_pt17,
+	.test3       =  syna_testing_pt18,
+	.test4       =  syna_testing_Doze_noise,
+	.test5       =  syna_testing_dynamic_range,
+	.test6       =  syna_testing_Doze_dynamic_range,
+	.test7       =  syna_testing_Doze_dynamic_range_NULL,
+	.test8       =  syna_testing_dynamic_range_NULL,
+	.syna_black_screen_test_noise    =  syna_black_screen_test_noise,
+	.syna_black_screen_test_dynamic  =  syna_black_screen_test_dynamic,
+	.syna_auto_test_preoperation  =  synaptics_auto_test_preoperation,
+	.syna_auto_test_endoperation  =  synaptics_auto_test_endoperation,
+	.syna_auto_black_screen_test_preoperation  =  synaptics_auto_black_screen_test_preoperation,
+	.syna_auto_black_screen_test_endoperation  =  synaptics_auto_black_screen_test_endoperation,
+};
+
 static struct engineer_test_operations syna_engineer_test_ops = {
 	.auto_test                  = synaptics_auto_test,
 	.black_screen_test 			= synaptics_black_screen_test,
@@ -5049,6 +5268,7 @@ static void syna_tcm_parse_dts(struct syna_tcm_hcd *tcm_hcd, struct spi_device *
 	}
 
 	tcm_hcd->irq_trigger_hdl_support = of_property_read_bool(np, "synaptics,irq_trigger_hdl_support");
+	tcm_hcd->pt17_pt18_test_support = of_property_read_bool(np, "pt17_pt18_test_support");
 }
 
 static int syna_tcm_spi_probe(struct spi_device *spi)
@@ -5122,6 +5342,9 @@ static int syna_tcm_spi_probe(struct spi_device *spi)
 	atomic_set(&tcm_hcd->command_status, CMD_IDLE);
 
 	syna_tcm_parse_dts(tcm_hcd, spi);
+	if (tcm_hcd->pt17_pt18_test_support) {
+		ts->com_test_data.chip_test_ops = &synaptics_test_ops2;
+	}
 #if defined(CONFIG_SPI_MT65XX)
 	spi->controller_data = (void *)&spi_ctrdata;
 #endif

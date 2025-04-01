@@ -35,6 +35,8 @@
 #define PDE_DATA pde_data
 #endif
 
+#define LCD_CTL_AOD_ON 0x02
+
 #define TP_SUPPORT_MAX 3
 #define TP_NAME_SIZE_MAX 30
 
@@ -46,6 +48,7 @@
 /*********PART2:Define Area**********************/
 
 #define PAGESIZE 512
+#define MAX_AIINFO_SIZE 4096
 #define MAX_GESTURE_COORD 6
 #define MAX_FINGER_NUM 10
 
@@ -153,6 +156,8 @@
 #define REPORT_RATE_GAME_300    300
 #define REPORT_RATE_GAME_600    600
 
+#define REPORT_RATE_MAX_TEST_TIME_S    20
+
 #ifdef TP_ALL_GESTURE_SUPPORT
 #undef TP_ALL_GESTURE_SUPPORT
 #endif
@@ -189,7 +194,10 @@
 #define MIN_TEMPERATURE             -40
 
 #define MAX_SUSPEND_TASK_DUMP_COUNT 3
+#define MAX_AIUNIT_GET_NUM          30
+#define MAX_AIUNIT_SET_NUM          7
 
+#define MAX_REPORT_FRAME_TEST_FRAME 100
 /*********PART3:Struct Area**********************/
 typedef enum {
 	TYPE_ONCELL = 0,   /*such as synaptic s3706*/
@@ -222,6 +230,7 @@ typedef enum {
 	MODE_PALM_TO_SLEEP,
 	MODE_WATERPROOF,
 	MODE_LEATHER_COVER,
+	MODE_INCELL_AOD,
 } work_mode;
 
 typedef enum {
@@ -343,6 +352,7 @@ typedef enum lcd_event_type {
 	LCD_CTL_CS_OFF,
 	LCD_CTL_IRQ_ON,
 	LCD_CTL_IRQ_OFF,
+	LCD_CTL_AOD_OFF,
 } lcd_event_type;
 
 typedef enum {
@@ -482,6 +492,16 @@ typedef enum {
 	FP_NODE_FOR_LSI = 2,/*for LSI touch fp_enable node*/
 	FP_QUICK_START_ON = 3,/*for fingerprint quick start featrue*/
 } fp_node_value;
+
+/******For Game Hot Zone******/
+struct tp_aiunit_game_info {
+	u8  gametype;
+	u8  aiunit_game_type;
+	u16 left;
+	u16 top;
+	u16 right;
+	u16 bottom;
+};
 
 /******For HW resource area********/
 struct panel_info {
@@ -1021,8 +1041,13 @@ struct touchpanel_data {
 	bool force_bus_ready_support;                       /*force bus ready to true afer notify*/
 	bool skip_reinit_device_support;                    /*spi need skip complete_all, prevent error in access reg*/
 	bool edge_pull_out_support;                         /*feature used to edge coordinates pull out*/
+	bool aiunit_game_info_support;                      /*feature used to aiunit game info*/
 	bool fpga_support;
 	bool disable_touch_event_support;                      /*feature to support underwater photo*/
+	u8 aiunit_game_get_num;
+	u8 aiunit_game_set_num;
+	int aiunit_game_enable;
+	u32 aiunit_game_valid_bits;
 	/******For FW update area********/
 	bool loading_fw;                                    /*touchpanel FW updating*/
 	int firmware_update_type;                           /*firmware_update_type: 0=check firmware version 1=force update; 2=for FAE debug*/
@@ -1041,6 +1066,7 @@ struct touchpanel_data {
 	struct engineer_test_operations   *engineer_ops;     /*call_back function*/
 	bool auto_test_need_cal_support;
 	bool sportify_aod_gesture_support;
+	bool incell_aod_gesture_support;
 	/******For button key area********/
 	/*every bit declear one state of key "reserve(keycode)|home(keycode)|menu(keycode)|back(keycode)"*/
 	u8   vk_bitmap;
@@ -1055,6 +1081,8 @@ struct touchpanel_data {
 	wait_queue_head_t wait;
 	bool up_status;
 	int touch_report_num;
+	int touch_frame_num;
+	u32 max_report_rate_limit;
 	struct point_info last_point;
 	int last_width_major;
 	int last_touch_major;
@@ -1069,6 +1097,7 @@ struct touchpanel_data {
 	bool double_tap_to_wake_enable;                     /*control state of dt2w*/
 	struct gesture_info    gesture;                     /*gesture related info*/
 	int gesture_enable_indep;                         /*independent control state of black gesture*/
+	bool incell_aod_flag;
 
 	/******For fingerprint area********/
 	int fp_enable;                                      /*underscreen fingerprint enable or not*/
@@ -1119,6 +1148,10 @@ struct touchpanel_data {
 	struct touchpanel_last_x_y_point   last_x_y_point[MAX_FINGER_NUM];        /*last_x_y_point data*/
 	struct exception_data    exception_data;			/*exception_data monitor data*/
 
+	/******For Game Hot Zone*******/
+	struct tp_aiunit_game_info tp_ic_aiunit_game_info[MAX_AIUNIT_SET_NUM];    /*tp ic aiunit game info*/
+	struct tp_aiunit_game_info tp_get_aiunit_game_info[MAX_AIUNIT_GET_NUM];   /*tp get aiunit game info*/
+
 	/******For prevention area********/
 	struct mutex		report_mutex;                /*mutex for lock input report flow*/
 	struct kernel_grip_info *grip_info;	/*grip setting and resources*/
@@ -1143,12 +1176,14 @@ struct touchpanel_data {
     u64 curr_time;/*Record the interruption time to kernel*/
     u64 irq_interval;/*Record the interruption time to calculate the reporting rate*/
     u64 irq_handle_time;/*Record the interruption handle time*/
+	u64 touch_down_time;/*Record the touch down time*/
 	/******For other feature area********/
 	struct wakeup_source *ws;                           /*Qualcomm KBA-211220012446, To make power manager stay awake*/
 	struct wakeup_source *tp_wakelock;  				/* speed_resume add  awakelock*/
 	bool is_incell_panel;                               /*touchpanel is incell*/
 	bool disable_suspend_irq_handler;                   /*touchpanel is support disable suspend irq handler */
 	bool is_noflash_ic;                                 /*noflash ic*/
+	bool report_rate_testing;                            /*is report rate testing*/
 	tp_bus_type bus_type;                                 /* tp bus type*/
 	int palm_enable;                                    /*palm enable or not*/
 	int fd_enable;                                        /*face dectet enable or not*/
@@ -1165,6 +1200,10 @@ struct touchpanel_data {
 	int tp_ic_touch_num;                                 /*tp ic get touch num */
 	int last_tp_ic_touch_num;                            /*last tp ic get touch num */
 	int pen_mode_tp_state;
+	u32 get_frame_num;
+	u16 report_rate_test_time;
+	u32 touch_major_sum;
+
 
 	int palm_to_sleep_enable;                            /*detect palm need to sleep when device in Screen lock*/
 
@@ -1419,6 +1458,7 @@ struct oplus_touchpanel_operations {
 	int (*pen_uplink_msg)(void *chip_data, u32 buf_len, u8 *buf, u32 *out_len);
 	int (*pen_downlink_msg)(void *chip_data, u32 cmd, u32 buf_len, u8 *buf);
 	int (*communicate_test)(void *chip_data);
+	void (*aiunit_game_info)(void *chip_data);
 };
 
 struct aging_test_proc_operations {
