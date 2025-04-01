@@ -3,8 +3,10 @@
  * Copyright (C) 2018-2020 Oplus. All rights reserved.
  */
 
-#include <linux/kernel.h>
 #include <linux/module.h>
+
+#ifdef QCOM_PLATFORM
+#include <linux/kernel.h>
 #include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
@@ -339,7 +341,6 @@ typedef struct  {
 	struct dentry *de_power;
 
 	struct mutex lock;
-
 } oem_qmi_controller;
 
 
@@ -487,16 +488,16 @@ int oem_qmi_common_req(u32 cmd_type, const char *req_data, u32 req_len,
 	struct qmi_txn txn;
 	int ret = -1;
 
-  	OEM_QMI_MSG("enter\n");
+	OEM_QMI_MSG("enter\n");
 	if (!g_ctrl_ptr || !resp_data || !resp_len) {
-          	OEM_QMI_MSG("error 1\n");
+		OEM_QMI_MSG("error 1\n");
 		return -EINVAL;
 	}
 
 	req = kzalloc(sizeof(*req), GFP_KERNEL);
 
 	if (!req) {
-          	OEM_QMI_MSG("error 2\n");
+		OEM_QMI_MSG("error 2\n");
 		return -ENOMEM;
 	}
 
@@ -504,7 +505,7 @@ int oem_qmi_common_req(u32 cmd_type, const char *req_data, u32 req_len,
 
 	if (!resp) {
 		kfree(req);
-          	OEM_QMI_MSG("error 3\n");
+		OEM_QMI_MSG("error 3\n");
 		return -ENOMEM;
 	}
 
@@ -522,7 +523,7 @@ int oem_qmi_common_req(u32 cmd_type, const char *req_data, u32 req_len,
 			qmi_oem_update_common_resp_msg_v01_ei, resp);
 
 	if (ret < 0) {
-          	OEM_QMI_MSG("error 4\n");
+		OEM_QMI_MSG("error 4\n");
 		goto out;
 	}
 
@@ -533,14 +534,14 @@ int oem_qmi_common_req(u32 cmd_type, const char *req_data, u32 req_len,
 
 	if (ret < 0) {
 		qmi_txn_cancel(&txn);
-          	OEM_QMI_MSG("error 5\n");
+        OEM_QMI_MSG("error 5\n");
 		goto out;
 	}
 
 	ret = qmi_txn_wait(&txn, 5 * HZ);
 
 	if (ret < 0) {
-          	OEM_QMI_MSG("error 6\n");
+        OEM_QMI_MSG("error 6\n");
 		goto out;
 	}
 
@@ -555,7 +556,7 @@ int oem_qmi_common_req(u32 cmd_type, const char *req_data, u32 req_len,
 	}
 
 out:
-  	OEM_QMI_MSG("out\n");
+	OEM_QMI_MSG("out\n");
 	mutex_unlock(&g_ctrl_ptr->lock);
 	kfree(resp);
 	kfree(req);
@@ -678,13 +679,11 @@ out:
 */
 static const struct file_operations uim_power_fops = {
 	.open = simple_open,
-	/*.write = uim_qmi_power_up_debug,*/
 };
 
 
 static const struct file_operations oem_common_fops = {
 	.open = simple_open,
-	/*.write = oem_qmi_common_debug,*/
 };
 
 
@@ -969,6 +968,7 @@ static void oem_qmi_exit(void)
 
 	if (g_ctrl_ptr) {
 		platform_device_put(g_ctrl_ptr->pdev);
+		platform_device_del(g_ctrl_ptr->pdev);
 		kfree(g_ctrl_ptr);
 		g_ctrl_ptr = NULL;
 	}
@@ -977,6 +977,20 @@ static void oem_qmi_exit(void)
 	if(qmi_debug_dir)
 		debugfs_remove(qmi_debug_dir);
 }
+
+#else
+
+static int oem_qmi_init(void)
+{
+	return 0;
+}
+
+static void oem_qmi_exit(void)
+{
+	return;
+}
+
+#endif /*QCOM_PLATFORM*/
 
 module_init(oem_qmi_init);
 module_exit(oem_qmi_exit);

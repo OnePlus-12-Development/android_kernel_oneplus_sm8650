@@ -942,6 +942,7 @@ static int aw2023_led_parse_child_node(struct aw2023_led *led_array,
 	struct aw2023_platform_data *pdata;
 	int rc = 0;
 	int parsed_leds = 0;
+	int i = 0;
 
 	for_each_child_of_node(node, temp) {
 		led = &led_array[parsed_leds];
@@ -953,7 +954,8 @@ static int aw2023_led_parse_child_node(struct aw2023_led *led_array,
 		if (!pdata) {
 			dev_err(&led->client->dev,
 				"Failed to allocate memory\n");
-			goto free_err;
+			parsed_leds--;
+			goto free_pdata;
 		}
 		pdata->led = led_array;
 		led->pdata = pdata;
@@ -1038,44 +1040,75 @@ static int aw2023_led_parse_child_node(struct aw2023_led *led_array,
 				"Failure reading off-time-ms, rc = %d\n", rc);
 			goto free_pdata;
 		}
+		parsed_leds++;
+	}
+	return 0;
+
+free_pdata:
+	for (i = 0; i <= parsed_leds; i++){
+		devm_kfree(&led_array->client->dev, led_array[i].pdata);
+	}
+	return rc;
+}
+
+static int aw2023_led_register(struct aw2023_led *led_array)
+{
+	struct aw2023_led *led;
+	int i = 0;
+	int rc = 0;
+
+	for (i = 0; i < led_array->num_leds; i++) {
+		led = &led_array[i];
 
 		INIT_WORK(&led->brightness_work, aw2023_brightness_work);
-
 		led->cdev.brightness_set = aw2023_set_brightness;
-		led->cdev.default_trigger = pdata->led_default_trigger;
+		led->cdev.default_trigger = led->pdata->led_default_trigger;
+
 		rc = led_classdev_register(&led->client->dev, &led->cdev);
 		if (rc) {
 			dev_err(&led->client->dev,
 				"unable to register led %d,rc=%d\n",
 				led->id, rc);
-			goto free_pdata;
+			goto free_sync;
 		}
 
 		rc = sysfs_create_group(&led->cdev.dev->kobj,
 				&aw2023_led_attr_group);
 		if (rc) {
 			dev_err(&led->client->dev, "led sysfs rc: %d\n", rc);
-			goto free_class;
+			goto free_dev;
 		}
-		parsed_leds++;
 	}
+
 	return 0;
-free_class:
-	aw2023_led_err_handle(led_array, parsed_leds);
-	led_classdev_unregister(&led_array[parsed_leds].cdev);
-	cancel_work_sync(&led_array[parsed_leds].brightness_work);
-	devm_kfree(&led->client->dev, led_array[parsed_leds].pdata);
-	led_array[parsed_leds].pdata = NULL;
+free_dev:
+	led_classdev_unregister(&led_array[i].cdev);
+free_sync:
+	cancel_work_sync(&led_array[i].brightness_work);
+	aw2023_led_err_handle(led_array, i);
 	return rc;
+}
 
-free_pdata:
-	aw2023_led_err_handle(led_array, parsed_leds);
-	devm_kfree(&led->client->dev, led_array[parsed_leds].pdata);
-	return rc;
+int aw2023_led_trigger_register(struct aw2023_led *led_array)
+{
+	struct aw2023_led *led;
+	int i = 0;
+	int ret = 0;
 
-free_err:
-	aw2023_led_err_handle(led_array, parsed_leds);
-	return rc;
+	for (i = 0; i < LED_MAX_NUM; i++) {
+		led = &led_array[i];
+		ret = led_trigger_register(&aw2023_led_trigger[i]);
+		if (ret < 0) {
+			dev_err(&led->client->dev, "register %d trigger fail\n", i);
+			goto fail_led_trigger;
+		}
+	}
+
+	return 0;
+fail_led_trigger:
+	while (--i >= 0)
+	led_trigger_unregister(&aw2023_led_trigger[i]);
+	return ret;
 }
 
 static int aw2023_led_probe(struct i2c_client *client,
@@ -1099,6 +1132,8 @@ static int aw2023_led_probe(struct i2c_client *client,
 	if (!led_array)
 		return -ENOMEM;
 
+	led_default = led_array;
+
 	led_array->client = client;
 	led_array->num_leds = num_leds;
 
@@ -1110,22 +1145,12 @@ static int aw2023_led_probe(struct i2c_client *client,
 		goto free_led_arry;
 	}
 
-	/* aw2023 led trigger register */
-	for (i = 0; i < LED_MAX_NUM; i++) {
-	    ret = led_trigger_register(&aw2023_led_trigger[i]);
-		if (ret < 0) {
-			dev_err(&client->dev, "register %d trigger fail\n", i);
-			goto fail_led_trigger;
-		}
-	}
-
-	led_default = led_array;
 	i2c_set_clientdata(client, led_array);
 
 	ret = aw2023_power_init(led_array, true);
 	if (ret) {
 		dev_err(&client->dev, "power init failed");
-		goto fail_led_trigger;
+		goto free_led_arry;
 	}
 
 	led_array->poweron = false;
@@ -1142,29 +1167,40 @@ static int aw2023_led_probe(struct i2c_client *client,
 	ret = aw2023_check_chipid(led_array);
 	if (ret) {
 		dev_err(&client->dev, "Check chip id error\n");
-		goto fail_led_trigger;
+		goto free_led_arry;
+	}
+
+	ret = aw2023_led_register(led_array);
+	if (ret) {
+		dev_err(&client->dev, "led register error\n");
+		goto free_led_arry;
+	}
+
+	/* aw2023 led trigger register */
+	ret = aw2023_led_trigger_register(led_array);
+	if (ret) {
+		dev_err(&client->dev, "led trigger register error\n");
+		goto free_led_register;
 	}
 
 	/* aw2023 led init */
 	ret = aw2023_init(led_array);
 	if (ret) {
 		dev_err(&client->dev, "aw2023_led_init_default: led[%d] error\n", i);
-		goto fail_led_trigger;
+		goto free_led_register;
 	}
 
 	led_default->aw2023_led_wq = create_singlethread_workqueue("aw2023_led_workqueue");
 	if (!led_default->aw2023_led_wq) {
 		dev_err(&client->dev, "aw2023_led_workqueue error\n");
-		goto fail_led_trigger;
+		goto free_led_register;
 	}
 	INIT_DELAYED_WORK(&led_default->aw2023_led_work, aw2023_work_func);
 	queue_delayed_work(led_default->aw2023_led_wq, &led_default->aw2023_led_work,LED_ESD_WORK_TIME * HZ);
 
 	return 0;
 
-fail_led_trigger:
-	while (--i >= 0)
-	led_trigger_unregister(&aw2023_led_trigger[i]);
+free_led_register:
 	aw2023_led_err_handle(led_array, num_leds);
 free_led_arry:
 	mutex_destroy(&led_array->lock);

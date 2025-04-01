@@ -3,9 +3,10 @@
  * Copyright (C) 2018-2020 Oplus. All rights reserved.
  */
 
-
-#include <linux/init.h>
 #include <linux/module.h>
+
+#ifdef QCOM_PLATFORM
+#include <linux/init.h>
 #include <linux/ioctl.h>
 #include <linux/fs.h>
 #include <linux/device.h>
@@ -27,6 +28,8 @@
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <linux/jiffies.h>
+#include <linux/pinctrl/consumer.h>
+#include <linux/version.h>
 
 #define GPIO_DEVICE_NAME "oplus-network-esim"
 
@@ -41,10 +44,6 @@ do { \
 do { \
 	printk(KERN_INFO log_fmt(a), __LINE__, GPIO_DEVICE_NAME, __func__, ##arg); \
 } while (0)
-
-
-#define MAX_GPIOS 3
-#define OPLUS_GPIO_MAJOR 0
 
 #define OPLUS_GPIO_MAGIC 'E'
 #define OPLUS_GPIO_GET_OUTPUT_VALUE      _IOWR(OPLUS_GPIO_MAGIC, 0, int)
@@ -98,10 +97,15 @@ typedef enum {
 	GPIO_TYPE_ESIM,
 	GPIO_TYPE_ESIM_PRESENT,
 	GPIO_TYPE_DUAL_SIM_DET,
+	GPIO_TYPE_ESIM_EN,
+	GPIO_TYPE_NFC_GPIO0,
+	MAX_GPIOS,
 } gpio_enum_type;
 
 extern int uim_qmi_power_up_req(u8 slot_id);
 extern int uim_qmi_power_down_req(u8 slot_id);
+
+static DEFINE_MUTEX(det_mutex);
 
 static int dual_sim_det_init(struct platform_device *pdev, void *gpio_info);
 
@@ -136,8 +140,29 @@ struct oplus_gpio_info oplus_gpio_info_table[MAX_GPIOS] = {
 		.devt = 0,
 		.is_proc = 1,
 		.proc_init = dual_sim_det_init,
+	},
+	[GPIO_TYPE_ESIM_EN] =
+	{
+		.dts_desc = "oplus,oplus-esim-en",
+		.dev_node_desc = "esim-en",
+		.gpio = -1,
+		.gpio_mode = 1,
+		.gpio_status = 0,
+		.devt = 0,
+		.is_proc = 0,
+	},
+	[GPIO_TYPE_NFC_GPIO0] =
+	{
+		.dts_desc = "oplus,oplus-nfc-gpio0",
+		.dev_node_desc = "nfc-gpio0",
+		.gpio = -1,
+		.gpio_mode = 1,
+		.gpio_status = 0,
+		.devt = 0,
+		.is_proc = 0,
 	}
 };
+
 static struct delayed_work recover_work;
 
 static int dual_sim_det_uim2_to_real_sim(void)
@@ -176,6 +201,9 @@ static int dual_sim_det_show(struct seq_file *m, void *v)
 
 	OPLUS_GPIO_MSG("dual_sim_det_show begin");
 	if (det_info) {
+		if (!mutex_trylock(&det_mutex)) {
+			return -1;
+		}
 		det_info->gpio_status = -1;
 
 		/* uim2 switch to real sim */
@@ -228,8 +256,9 @@ static int dual_sim_det_show(struct seq_file *m, void *v)
 			schedule_delayed_work(&recover_work, msecs_to_jiffies(4100));
 		}
 
-        OPLUS_GPIO_MSG("dual_sim_det_show end1");
+		OPLUS_GPIO_MSG("dual_sim_det_show end1");
 		seq_printf(m, "%d\n", det_info->gpio_status);
+		mutex_unlock(&det_mutex);
 	}
 	OPLUS_GPIO_MSG("dual_sim_det_show end2");
 
@@ -239,16 +268,9 @@ static int dual_sim_det_show(struct seq_file *m, void *v)
 static int dual_sim_det_proc_open(struct inode *inode, struct file *file)
 {
 	OPLUS_GPIO_MSG("begin single_open");
+
 	return single_open(file, dual_sim_det_show, pde_data(inode));
 }
-
-/*static const struct file_operations dual_sim_det_fops = {
-	.open = dual_sim_det_proc_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};*/
-
 
 static const struct proc_ops dual_sim_det_fops = {
 	.proc_open = dual_sim_det_proc_open,
@@ -358,11 +380,12 @@ static long oplus_gpio_ioctl(struct file *filp, unsigned int cmd,
 	int gpio_status = -1;
 	int cmd_abs = cmd - OPLUS_GPIO_GET_OUTPUT_VALUE;
 
-	/* OPLUS_GPIO_MSG("enter\n"); */
+	OPLUS_GPIO_MSG("enter\n");
 
 	gpio_info = filp->private_data;
 
 	if (gpio_info == NULL) {
+		OPLUS_GPIO_MSG("return efault");
 		return -EFAULT;
 	}
 
@@ -502,7 +525,6 @@ static const struct of_device_id oplus_gpio_dt_ids[] = {
 	{},
 };
 
-
 MODULE_DEVICE_TABLE(of, oplus_gpio_dt_ids);
 
 static const struct file_operations oplus_gpio_fops = {
@@ -563,9 +585,11 @@ static int oplus_gpio_probe(struct platform_device *pdev)
 		OPLUS_GPIO_ERR("failed to add chrdev\n");
 		goto error_add;
 	}
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+	gpio_data->oplus_gpio_class = class_create(GPIO_DEVICE_NAME);
+#else
 	gpio_data->oplus_gpio_class = class_create(THIS_MODULE, GPIO_DEVICE_NAME);
-
+#endif
 	if (IS_ERR(gpio_data->oplus_gpio_class)) {
 		OPLUS_GPIO_ERR("failed to create class\n");
 		goto err_class;
@@ -720,6 +744,20 @@ static void __exit oplus_gpio_exit(void)
 
 	platform_driver_unregister(&oplus_gpio_driver);
 }
+
+#else
+
+static int oplus_gpio_init(void)
+{
+	return 0;
+}
+
+static void oplus_gpio_exit(void)
+{
+	return;
+}
+
+#endif /*QCOM_PLATFORM*/
 
 
 module_init(oplus_gpio_init);

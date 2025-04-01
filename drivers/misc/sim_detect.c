@@ -32,8 +32,10 @@ struct sim_detect_data {
 	int sim_detect;
 };
 
+#ifdef QCOM_PLATFORM
 extern int oem_qmi_common_req(u32 cmd_type, const char *req_data, u32 req_len,
 	char *resp_data, u32 resp_len);
+#endif /*QCOM_PLATFORM*/
 
 static ssize_t proc_sim_detect_read(struct file *file,
                                     char __user *user_buf, size_t count, loff_t *ppos)
@@ -51,11 +53,13 @@ static ssize_t proc_sim_detect_read(struct file *file,
 
 	} else {
 		char resp_data[8] = {0};
+		#ifdef QCOM_PLATFORM
 		if (oem_qmi_common_req(MODEM_DETECT_CMD, NULL, 0, resp_data, 8)) {
 			SIMDETECT_ERR("failed to read status from modem\n");
 		} else {
 			sim_detect_value = resp_data[0];
 		}
+		#endif /*QCOM_PLATFORM*/
 	}
 
 	SIMDETECT_ERR("sim_detect_value:%d\n", sim_detect_value);
