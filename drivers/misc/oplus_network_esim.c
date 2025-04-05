@@ -5,7 +5,7 @@
 
 #include <linux/module.h>
 
-#ifdef QCOM_PLATFORM
+#ifdef CONFIG_OPLUS_SYSTEM_KERNEL_QCOM
 #include <linux/init.h>
 #include <linux/ioctl.h>
 #include <linux/fs.h>
@@ -757,7 +757,7 @@ static void oplus_gpio_exit(void)
 	return;
 }
 
-#endif /*QCOM_PLATFORM*/
+#endif /*CONFIG_OPLUS_SYSTEM_KERNEL_QCOM*/
 
 
 module_init(oplus_gpio_init);

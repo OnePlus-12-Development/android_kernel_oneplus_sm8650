@@ -5,7 +5,7 @@
 
 #include <linux/module.h>
 
-#ifdef QCOM_PLATFORM
+#ifdef CONFIG_OPLUS_SYSTEM_KERNEL_QCOM
 #include <linux/kernel.h>
 #include <linux/debugfs.h>
 #include <linux/device.h>
@@ -990,7 +990,7 @@ static void oem_qmi_exit(void)
 	return;
 }
 
-#endif /*QCOM_PLATFORM*/
+#endif /*CONFIG_OPLUS_SYSTEM_KERNEL_QCOM*/
 
 module_init(oem_qmi_init);
 module_exit(oem_qmi_exit);
