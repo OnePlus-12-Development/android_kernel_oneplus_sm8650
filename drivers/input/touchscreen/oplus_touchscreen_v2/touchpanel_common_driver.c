@@ -3532,12 +3532,12 @@ static void tp_delta_read_triggered_by_key_handle(struct work_struct *work)
 	struct touchpanel_data *ts = container_of(work, struct touchpanel_data,
 				key_trigger_work);
 
+	if (!ts)
+		return;
+
 	TP_INFO(ts->tp_index, "%s:tp_debug= %d\n", __func__, tp_debug);
 
 	if (tp_debug != 2)
-		return;
-
-	if (!ts)
 		return;
 
 	touchpanel_trusted_touch_completion(ts);

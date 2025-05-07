@@ -1298,6 +1298,7 @@ struct oplus_chg_chip {
 	int led_temp_status;
 	bool vooc_temp_change;
 	int vooc_temp_status;
+	bool full_limit_curr_support;
 	bool camera_on;
 	bool camera_on_pre;
 	bool calling_on;

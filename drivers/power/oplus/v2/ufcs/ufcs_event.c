@@ -240,6 +240,11 @@ struct ufcs_msg *ufcs_unpack_msg(struct ufcs_class *class, const u8 *buf, int le
 	case UFCS_DATA_MSG:
 		msg->data_msg.command = buf[MSG_DATA_INDEX];
 		msg->data_msg.length = buf[MSG_DATA_INDEX + 1];
+		if (msg->data_msg.length + msg_size + 1 != len) {
+			ufcs_err("data message length invalid, len=%d, msg_size=%d, buf[%*ph]\n",
+				len, msg_size, len, buf);
+			goto err;
+		}
 		memcpy(msg->data_msg.data, &buf[MSG_DATA_INDEX + 2], msg->data_msg.length);
 		ufcs_data_msg_init(&msg->data_msg);
 		if (config->check_crc) {
@@ -262,8 +267,9 @@ struct ufcs_msg *ufcs_unpack_msg(struct ufcs_class *class, const u8 *buf, int le
 			msg_size = MSG_HEAD_SIZE + 3 + msg->vendor_msg.length + 1;
 		else
 			msg_size = MSG_HEAD_SIZE + 3 + msg->vendor_msg.length;
-		if (len < msg_size) {
-			ufcs_err("vendor message length too short, len=%d, msg_size=%d\n", len, msg_size);
+		if (len != msg_size) {
+			ufcs_err("vendor message length invalid, len=%d, msg_size=%d, buf[%*ph]\n",
+				len, msg_size, len, buf);
 			goto err;
 		}
 		memcpy(msg->vendor_msg.data, &buf[MSG_DATA_INDEX + 3], msg->vendor_msg.length);

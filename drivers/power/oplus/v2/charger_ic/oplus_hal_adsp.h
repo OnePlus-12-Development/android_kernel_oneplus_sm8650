@@ -609,7 +609,6 @@ struct battery_chg_dev {
 	int				last_charger_type;
 	int				adsp_crash;
 	atomic_t			state;
-	int				g_icl_ma;
 	int				rerun_max;
 	int				pd_chg_volt;
 	struct work_struct		subsys_up_work;
