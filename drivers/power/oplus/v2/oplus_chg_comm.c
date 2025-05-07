@@ -428,7 +428,6 @@ struct oplus_chg_comm {
 
 	unsigned int nvid_support_flags;
 	int plc_status;
-	int plc_support;
 };
 
 static struct oplus_comm_spec_config default_spec = {
@@ -1158,13 +1157,10 @@ static void oplus_comm_start_timeout_work(struct oplus_chg_comm *chip)
 	if (chip->wls_online)
 		goto start;
 
-	if (!chip->plc_support)
-		goto start;
-
 	if (chip->chging_over_time)
 		return;
 
-	if (chip->plc_status != PLC_STATUS_ENABLE && chip->plc_status != PLC_STATUS_WAIT)
+	if (chip->plc_status != PLC_STATUS_ENABLE)
 		goto start;
 
 	if (delayed_work_pending(&chip->charge_timeout_work))
@@ -2182,11 +2178,7 @@ static int oplus_comm_set_ui_soc(struct oplus_chg_comm *chip, int soc)
 
 	if (chip->ui_soc == soc)
 		return 0;
-
-	if ((chip->plc_status == PLC_STATUS_ENABLE || chip->plc_status == PLC_STATUS_WAIT) && (chip->ui_soc < soc))
-		chip->ui_soc = chip->ui_soc;
-	else
-		chip->ui_soc = soc;
+	chip->ui_soc = soc;
 
 	chg_info("set ui_soc=%d\n", soc);
 	chip->soc_update_jiffies = jiffies;
@@ -3744,6 +3736,8 @@ static void oplus_comm_check_ffc(struct oplus_chg_comm *chip)
 				oplus_comm_get_ffc_temp_region_str(ffc_temp_region));
 			oplus_ffc_exit_reset_info(chip);
 			if (chip->wired_online) {
+				if (chip->soc >= 100)
+					goto err;
 				if (is_wired_charging_disable_votable_available(chip))
 					vote(chip->wired_charging_disable_votable, FFC_VOTER, true, 1, false);
 				oplus_comm_set_ffc_status(chip, FFC_IDLE);
@@ -5275,12 +5269,6 @@ static void oplus_comm_plc_subs_callback(struct mms_subscribe *subs,
 	switch (type) {
 	case MSG_TYPE_ITEM:
 		switch (id) {
-		case PLC_ITEM_SUPPORT:
-			oplus_mms_get_item_data(chip->plc_topic, id, &data,
-						false);
-			chip->plc_support = !!data.intval;
-			oplus_comm_start_timeout_work(chip);
-			break;
 		case PLC_ITEM_STATUS:
 			oplus_mms_get_item_data(chip->plc_topic, id, &data,
 						false);
@@ -5313,9 +5301,6 @@ static void oplus_comm_subscribe_plc_topic(struct oplus_mms *topic,
 		return;
 	}
 
-	rc = oplus_mms_get_item_data(chip->plc_topic, PLC_ITEM_SUPPORT, &data, true);
-	if (rc >= 0)
-		chip->plc_support = data.intval;
 	rc = oplus_mms_get_item_data(chip->plc_topic, PLC_ITEM_STATUS, &data, true);
 	if (rc >= 0)
 		chip->plc_status = data.intval;

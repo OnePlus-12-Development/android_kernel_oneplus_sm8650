@@ -6357,8 +6357,7 @@ static int oplus_chg_set_input_current(struct battery_chg_dev *bcdev, int curren
 	}
 	usleep_range(50000, 51000);
 	if (qpnp_get_prop_vbus_collapse_status(bcdev) == true) {
-		if (bcdev->rerun_max > 0) {
-			bcdev->g_icl_ma = current_ma;
+		if (bcdev->rerun_max > 0 && bcdev->usb_in_status) {
 			schedule_delayed_work(&bcdev->vbus_collapse_rerun_icl_work,
 				msecs_to_jiffies(3000)); /* vbus_collapse_status resumes after three seconds */
 			bcdev->rerun_max--;
@@ -6538,7 +6537,6 @@ common_charge_aicl_end:
 	chg_info("common_charge_aicl_end set icl:%d mA, rc=%d\n", DEFAULT_CURR_BY_CC, rc);
 	goto aicl_return;
 aicl_return:
-	bcdev->g_icl_ma = usb_icl[i];
 	return rc;
 }
 
@@ -6546,11 +6544,16 @@ static void oplus_vbus_collapse_rerun_icl_work(struct work_struct *work)
 {
 	struct battery_chg_dev *bcdev = container_of(work,
 		struct battery_chg_dev, vbus_collapse_rerun_icl_work.work);
+	struct votable *icl_votable = find_votable("WIRED_ICL");
 
-	if (qpnp_get_prop_vbus_collapse_status(bcdev) == false)
+	if (!bcdev->usb_in_status) {
+		chg_info("usb unpluged, return\n");
 		return;
+	}
 
-	oplus_chg_set_input_current(bcdev, bcdev->g_icl_ma);
+	chg_info("retun icl\n");
+	if (icl_votable)
+		rerun_election(icl_votable, true);
 }
 
 static int oplus_chg_8350_set_icl(struct oplus_chg_ic_dev *ic_dev,

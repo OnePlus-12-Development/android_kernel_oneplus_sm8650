@@ -565,7 +565,6 @@ struct chip_bq27541 {
 	int min_vol_pre;
 	int batt_num;
 
-	bool fcc_too_small_check_support;
 	bool fcc_too_small_checking;
 	struct work_struct fcc_too_small_check_work;
 
@@ -588,6 +587,8 @@ struct chip_bq27541 {
 	const u8 *static_df_checksum_60;
 	const u8 **afi_buf;
 	unsigned int *afi_buf_len;
+	u8 *bq28z610_afi_buf;
+	int bq28z610_afi_cnt;
 	bool batt_bq28z610;
 	bool batt_bq27z561;
 	bool batt_nfg8011b;

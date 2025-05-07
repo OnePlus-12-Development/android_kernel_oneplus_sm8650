@@ -433,6 +433,8 @@ struct oplus_ufcs {
 	struct oplus_impedance_node *input_imp_node;
 	struct oplus_impedance_unit *imp_uint;
 
+	struct oplus_plc_protocol *opp;
+
 #if IS_ENABLED(CONFIG_OPLUS_DYNAMIC_CONFIG_CHARGER)
 	struct oplus_cfg debug_cfg;
 #endif
@@ -456,6 +458,7 @@ struct oplus_ufcs {
 	unsigned int err_flag;
 	bool ufcs_online;
 	bool ufcs_charging;
+	bool handshake_ok;
 	bool adapter_check_third_ufcs;
 	int retention_ufcs_power;
 	bool oplus_ufcs_adapter;
@@ -522,7 +525,6 @@ struct oplus_ufcs {
 	bool lift_vbus_use_cpvout;
 	bool ufcs_dispatch_key_ok;
 	int plc_status;
-	int plc_support;
 	int plc_curr;
 	u16 ufcs_vid;
 };
@@ -795,6 +797,7 @@ static int oplus_ufcs_set_online(struct oplus_ufcs *chip, bool online)
 static int oplus_ufcs_set_charging(struct oplus_ufcs *chip, bool charging)
 {
 	struct mms_msg *msg;
+	enum oplus_plc_chg_mode chg_mode;
 	int rc;
 
 	if (chip->ufcs_charging == charging)
@@ -814,6 +817,26 @@ static int oplus_ufcs_set_charging(struct oplus_ufcs *chip, bool charging)
 	rc = oplus_mms_publish_msg(chip->ufcs_topic, msg);
 	if (rc < 0) {
 		chg_err("publish ufcs charging msg error, rc=%d\n", rc);
+		kfree(msg);
+		return rc;
+	}
+
+	if (chip->plc_topic == NULL)
+		return 0;
+
+	if (charging)
+		chg_mode = PLC_CHG_MODE_CP;
+	else
+		chg_mode = PLC_CHG_MODE_BUCK;
+	msg = oplus_mms_alloc_int_msg(MSG_TYPE_ITEM, MSG_PRIO_HIGH,
+				      PLC_ITEM_CHG_MODE, chg_mode);
+	if (msg == NULL) {
+		chg_err("alloc msg error\n");
+		return -ENOMEM;
+	}
+	rc = oplus_mms_publish_msg(chip->plc_topic, msg);
+	if (rc < 0) {
+		chg_err("publish plc chg mode msg error, rc=%d\n", rc);
 		kfree(msg);
 	}
 
@@ -872,6 +895,17 @@ static int oplus_ufcs_set_oplus_adapter(struct oplus_ufcs *chip, bool oplus_adap
 	}
 
 	return rc;
+}
+
+static void oplus_ufcs_set_plc_strategy(struct oplus_ufcs *chip)
+{
+	if (chip->opp == NULL)
+		return;
+
+	if (chip->oplus_ufcs_adapter)
+		oplus_plc_protocol_set_strategy(chip->opp, "default");
+	else
+		oplus_plc_protocol_set_strategy(chip->opp, "third");
 }
 
 static int oplus_ufcs_set_ufcs_vid(struct oplus_ufcs *chip, u16 vid)
@@ -1508,6 +1542,8 @@ static int oplus_ufcs_cp_set_ucp_disable(struct oplus_ufcs *chip, bool disable)
 		chg_err("cp_ic is NULL\n");
 		return -ENODEV;
 	}
+	if (chip->opp == NULL)
+		return -ENOTSUPP;
 
 	rc = oplus_chg_ic_func(chip->cp_ic, OPLUS_IC_FUNC_CP_SET_UCP_DISABLE, disable);
 
@@ -1848,6 +1884,7 @@ static void oplus_ufcs_force_exit(struct oplus_ufcs *chip)
 	chip->power_imax = 0;
 	oplus_ufcs_cp_set_work_start(chip, false);
 	oplus_ufcs_exit_ufcs_mode(chip);
+	chip->handshake_ok = false;
 	msleep(UFCS_STOP_DELAY_TIME);
 	oplus_ufcs_cp_enable(chip, false);
 	oplus_ufcs_cp_adc_enable(chip, false);
@@ -1856,15 +1893,12 @@ static void oplus_ufcs_force_exit(struct oplus_ufcs *chip)
 	oplus_ufcs_set_adapter_id(chip, 0);
 	vote(chip->ufcs_curr_votable, STEP_VOTER, false, 0, false);
 	vote(chip->ufcs_curr_votable, EIS_VOTER, false, 0, false);
-	vote(chip->ufcs_not_allow_votable, PLC_VOTER, false, 0, false);
 	vote(chip->ufcs_not_allow_votable, PLC_SOC_VOTER, false, 0, false);
 	vote(chip->ufcs_disable_votable, PLC_RETRY_VOTER, false, 0, false);
 	if (is_wired_suspend_votable_available(chip))
 		vote(chip->wired_suspend_votable, UFCS_VOTER, false, 0, false);
-	if (is_disable_charger_vatable_available(chip)) {
+	if (is_disable_charger_vatable_available(chip))
 		vote(chip->chg_disable_votable, UFCS_VOTER, false, 0, false);
-		vote(chip->chg_disable_votable, PLC_VOTER, false, 0, false);
-	}
 	oplus_cpa_request_unlock(chip->cpa_topic, UFCS_VOTER);
 }
 
@@ -1878,6 +1912,7 @@ static void oplus_ufcs_soft_exit(struct oplus_ufcs *chip)
 	chip->startup_retry_times = 0;
 	oplus_ufcs_cp_set_work_start(chip, false);
 	oplus_ufcs_exit_ufcs_mode(chip);
+	chip->handshake_ok = false;
 	msleep(UFCS_STOP_DELAY_TIME);
 	oplus_ufcs_cp_enable(chip, false);
 	oplus_ufcs_cp_adc_enable(chip, false);
@@ -2205,6 +2240,11 @@ static void oplus_ufcs_switch_check_work(struct work_struct *work)
 	bool ufcs_boot_retry = false;
 	union mms_msg_data msg_data = { 0 };
 
+	if (chip->handshake_ok) {
+		chg_info("handshake_ok is true, exit\n");
+		return;
+	}
+
 	chg_info("ufcs_switch_check_work\n");
 	oplus_ufcs_set_charging(chip, false);
 	rc = oplus_cpa_switch_start(chip->cpa_topic, CHG_PROTOCOL_UFCS);
@@ -2249,6 +2289,7 @@ static void oplus_ufcs_switch_check_work(struct work_struct *work)
 		}
 		goto err;
 	}
+	chip->handshake_ok = true;
 	chg_info("ufcs handshake success\n");
 
 	rc = oplus_ufcs_get_dev_info(chip, &chip->dev_info);
@@ -2321,6 +2362,7 @@ static void oplus_ufcs_switch_check_work(struct work_struct *work)
 			goto next;
 	}
 	oplus_ufcs_set_online(chip, true);
+	oplus_ufcs_set_plc_strategy(chip);
 
 	rc = oplus_ufcs_get_pdo_info(chip, chip->pdo, UFCS_OUTPUT_MODE_MAX);
 	if (rc < 0) {
@@ -2431,6 +2473,7 @@ next:
 	return;
 
 exit:
+	chip->handshake_ok = false;
 	oplus_ufcs_exit_ufcs_mode(chip);
 	chip->cp_work_mode = CP_WORK_MODE_UNKNOWN;
 	chip->cp_ratio = 0;
@@ -3416,7 +3459,7 @@ static void oplus_ufcs_check_low_curr_full(struct oplus_ufcs *chip)
 static void oplus_ufcs_check_timeout(struct oplus_ufcs *chip)
 {
 	unsigned long tmp_time;
-	if (chip->plc_status == PLC_STATUS_ENABLE || chip->plc_status == PLC_STATUS_WAIT)
+	if (chip->plc_status == PLC_STATUS_ENABLE)
 		return;
 	tmp_time = jiffies - chip->timer.monitor_jiffies;
 	chip->timer.monitor_jiffies = jiffies;
@@ -3545,7 +3588,7 @@ static void oplus_ufcs_check_ibat_safety(struct oplus_ufcs *chip)
 		chip->count.ibat_high = 0;
 	}
 
-	if (chip->plc_status == PLC_STATUS_ENABLE || chip->plc_status == PLC_STATUS_WAIT)
+	if (chip->plc_status == PLC_STATUS_ENABLE)
 		return;
 
 	if (ibat > UFCS_IBAT_LOW_MIN) {
@@ -3790,7 +3833,7 @@ static void oplus_ufcs_set_plc_curr(struct oplus_ufcs *chip)
 {
 	int target_curr;
 
-	if (chip->plc_status != PLC_STATUS_ENABLE && chip->plc_status != PLC_STATUS_WAIT)
+	if (chip->plc_status != PLC_STATUS_ENABLE)
 		return;
 
 	target_curr = chip->plc_curr;
@@ -3811,7 +3854,7 @@ static void oplus_ufcs_imp_check(struct oplus_ufcs *chip)
 
 	if (!chip->imp_uint)
 		return;
-	if (chip->plc_status == PLC_STATUS_ENABLE || chip->plc_status == PLC_STATUS_WAIT) {
+	if (chip->plc_status == PLC_STATUS_ENABLE) {
 		chip->need_preliminary_imp_check = false;
 		return;
 	}
@@ -3860,11 +3903,8 @@ static void oplus_ufcs_watchdog(struct oplus_ufcs *chip)
 
 static void oplus_ufcs_check_current_low(struct oplus_ufcs *chip)
 {
-	int iin, vchg;
 #define UFCS_CURR_LOW_LIMIT	150
 #define UFCS_CURR_LOW_CNT	6
-	vchg = UFCS_SOURCE_INFO_VOL(chip->src_info);
-	iin = UFCS_SOURCE_INFO_CURR(chip->src_info);
 
 	if (UFCS_SOURCE_INFO_CURR(chip->src_info) >= UFCS_CURR_LOW_LIMIT) {
 		chip->count.output_low = 0;
@@ -3875,19 +3915,11 @@ static void oplus_ufcs_check_current_low(struct oplus_ufcs *chip)
 	if (chip->count.output_low < UFCS_CURR_LOW_CNT)
 		return;
 
-	if ((chip->plc_status == PLC_STATUS_ENABLE || chip->plc_status == PLC_STATUS_WAIT) &&
-		get_client_vote(chip->ufcs_not_allow_votable, PLC_VOTER) <= 0) {
-		chg_info("[%d, %d, %d]\n", chip->plc_status,  get_client_vote(chip->ufcs_not_allow_votable, PLC_VOTER),
-			get_client_vote(chip->chg_disable_votable, PLC_VOTER));
+	if (chip->plc_status == PLC_STATUS_ENABLE)
 		vote(chip->ufcs_not_allow_votable, PLC_VOTER, true, 1, false);
-		if (is_disable_charger_vatable_available(chip))
-			vote(chip->chg_disable_votable, PLC_VOTER, true, 1, false);
-	} else {
-		chg_info("ufcs ibus low, exit ufcs fast charge [%d, %d, %d]\n", chip->plc_status, chip->count.output_low,
-			get_client_vote(chip->ufcs_not_allow_votable, PLC_VOTER));
+	else
 		vote(chip->ufcs_disable_votable, IOUT_CURR_VOTER, true, 1, false);
-		chip->count.output_low = 0;
-	}
+	chip->count.output_low = 0;
 }
 
 static void oplus_ufcs_check_ibus_curr(struct oplus_ufcs *chip)
@@ -4289,7 +4321,7 @@ static void oplus_ufcs_current_work(struct work_struct *work)
 	oplus_ufcs_check_current_low(chip);
 	curr_cc = oplus_ufcs_get_current_cc(chip);
 	oplus_ufcs_volt_update_check(chip);
-	if ((chip->plc_status == PLC_STATUS_ENABLE || chip->plc_status == PLC_STATUS_WAIT) && curr_cc < PLC_IBUS_MAX) {
+	if ((chip->plc_status == PLC_STATUS_ENABLE) && curr_cc < PLC_IBUS_MAX) {
 		if (chip->vol_set_mv == chip->config.target_vbus_mv) {
 			chip->target_vbus_mv = UFCS_SOURCE_INFO_VOL(chip->src_info) + UFCS_THIRD_IBUS_PLC_THLD;
 		}
@@ -4310,6 +4342,8 @@ static void oplus_ufcs_current_work(struct work_struct *work)
 		} else {
 			curr_set = min(chip->target_curr_ma, get_client_vote(chip->ufcs_curr_votable, BASE_MAX_VOTER));
 		}
+		if (curr_set <= PLC_IBUS_DEFAULT)
+			curr_set = PLC_IBUS_DEFAULT;
 	}
 
 	chg_info("[%d, %d][%d, %d, %d, %d]\n", curr_set, chip->target_vbus_mv, curr_cc, chip->target_curr_ma, chip->curr_set_ma, chip->vol_set_mv);
@@ -5296,47 +5330,150 @@ static void oplus_ufcs_subscribe_retention_topic(struct oplus_mms *topic,
 		chip->connect_error_count = data.intval;
 }
 
+static int oplus_ufcs_plc_enable(struct oplus_plc_protocol *opp, enum oplus_plc_chg_mode mode)
+{
+	struct oplus_ufcs *chip;
+	int rc;
+
+	chip = oplus_plc_protocol_get_priv_data(opp);
+	if (chip == NULL) {
+		chg_err("chip is NULL\n");
+		return -EINVAL;
+	}
+
+	if (mode == PLC_CHG_MODE_AUTO) {
+		if (get_effective_result(chip->ufcs_not_allow_votable) > 0) {
+			mode = PLC_CHG_MODE_BUCK;
+			chg_info("mode chang to %s by %s", oplus_plc_chg_mode_str(mode),
+				 get_effective_client(chip->ufcs_not_allow_votable));
+		} else if (get_effective_result(chip->ufcs_disable_votable) > 0) {
+			mode = PLC_CHG_MODE_BUCK;
+			chg_info("mode chang to %s by %s", oplus_plc_chg_mode_str(mode),
+				 get_effective_client(chip->ufcs_disable_votable));
+		} else {
+			mode = PLC_CHG_MODE_CP;
+			chg_info("mode chang to %s", oplus_plc_chg_mode_str(mode));
+		}
+		if (mode == PLC_CHG_MODE_BUCK)
+			return 0;
+	}
+
+	if (mode == PLC_CHG_MODE_BUCK)
+		rc = vote(chip->ufcs_not_allow_votable, PLC_VOTER, true, 1, false);
+	else
+		rc = vote(chip->ufcs_not_allow_votable, PLC_VOTER, false, 0, false);
+
+	return rc;
+}
+
+static int oplus_ufcs_plc_disable(struct oplus_plc_protocol *opp)
+{
+	struct oplus_ufcs *chip;
+
+	chip = oplus_plc_protocol_get_priv_data(opp);
+	if (chip == NULL) {
+		chg_err("chip is NULL\n");
+		return -EINVAL;
+	}
+
+	vote(chip->ufcs_curr_votable, PLC_VOTER, false, 0, false);
+	return vote(chip->ufcs_not_allow_votable, PLC_VOTER, false, 0, false);
+}
+
+static int oplus_ufcs_plc_reset_protocol(struct oplus_plc_protocol *opp)
+{
+	struct oplus_ufcs *chip;
+	int rc;
+
+	chip = oplus_plc_protocol_get_priv_data(opp);
+	if (chip == NULL) {
+		chg_err("chip is NULL\n");
+		return -EINVAL;
+	}
+	if (!chip->oplus_ufcs_adapter)
+		return 0;
+
+	if (!chip->ufcs_charging) {
+		if (!is_wired_suspend_votable_available(chip))
+			return 0;
+		rc = vote(chip->wired_suspend_votable, UFCS_VOTER, true, 1, false);
+		msleep(UFCS_RESETADAPTER_SLEEP_1000MS);
+		rc |= vote(chip->wired_suspend_votable, UFCS_VOTER, false, 0, false);
+		return rc;
+	}
+
+	return vote(chip->ufcs_disable_votable, PLC_RETRY_VOTER, true, 1, false);
+}
+
+static int oplus_ufcs_plc_set_ibus(struct oplus_plc_protocol *opp, int ibus_ma)
+{
+	struct oplus_ufcs *chip;
+
+	chip = oplus_plc_protocol_get_priv_data(opp);
+	if (chip == NULL) {
+		chg_err("chip is NULL\n");
+		return -EINVAL;
+	}
+
+	chip->plc_curr = ibus_ma;
+	return 0;
+}
+
+static int oplus_ufcs_plc_get_ibus(struct oplus_plc_protocol *opp)
+{
+	struct oplus_ufcs *chip;
+
+	chip = oplus_plc_protocol_get_priv_data(opp);
+	if (chip == NULL) {
+		chg_err("chip is NULL\n");
+		return -EINVAL;
+	}
+
+	return get_client_vote(chip->ufcs_curr_votable, PLC_VOTER);
+}
+
+static int oplus_ufcs_plc_get_chg_mode(struct oplus_plc_protocol *opp)
+{
+	struct oplus_ufcs *chip;
+
+	chip = oplus_plc_protocol_get_priv_data(opp);
+	if (chip == NULL) {
+		chg_err("chip is NULL\n");
+		return -EINVAL;
+	}
+
+	if (chip->ufcs_charging)
+		return PLC_CHG_MODE_CP;
+	return PLC_CHG_MODE_BUCK;
+}
+
+static struct oplus_plc_protocol_desc g_plc_protocol_desc = {
+	.name = "ufcs",
+	.protocol = BIT(CHG_PROTOCOL_UFCS),
+	.current_active = false,
+	.ops = {
+		.enable = oplus_ufcs_plc_enable,
+		.disable = oplus_ufcs_plc_disable,
+		.reset_protocol = oplus_ufcs_plc_reset_protocol,
+		.set_ibus = oplus_ufcs_plc_set_ibus,
+		.get_ibus = oplus_ufcs_plc_get_ibus,
+		.get_chg_mode = oplus_ufcs_plc_get_chg_mode
+	}
+};
+
 static void oplus_ufcs_plc_subs_callback(struct mms_subscribe *subs,
 					 enum mms_msg_type type, u32 id, bool sync)
 {
 	struct oplus_ufcs *chip = subs->priv_data;
 	union mms_msg_data data = { 0 };
-	int rc;
 
 	switch (type) {
 	case MSG_TYPE_ITEM:
 		switch (id) {
-		case PLC_ITEM_SUPPORT:
-			oplus_mms_get_item_data(chip->plc_topic, id, &data,
-						false);
-			chip->plc_support = !!data.intval;
-			break;
 		case PLC_ITEM_STATUS:
 			oplus_mms_get_item_data(chip->plc_topic, id, &data,
 						false);
 			chip->plc_status = data.intval;
-			break;
-		case PLC_ITEM_CURR:
-			oplus_mms_get_item_data(chip->plc_topic, id, &data,
-						false);
-			chip->plc_curr = data.intval;
-			break;
-		case PLC_ITEM_DISCHG_NORMAL:
-			rc = oplus_mms_get_item_data(chip->plc_topic, id, &data, false);
-			if (rc == 0 && data.intval)
-			    vote(chip->ufcs_not_allow_votable, PLC_VOTER, true, 1, false);
-			else
-			    vote(chip->ufcs_not_allow_votable, PLC_VOTER, false, 0, false);
-			break;
-		case PLC_ITEM_DISCHG_SOC:
-			rc = oplus_mms_get_item_data(chip->plc_topic, id, &data, false);
-			if (rc == 0 && data.intval)
-			    vote(chip->ufcs_not_allow_votable, PLC_SOC_VOTER, true, 1, false);
-			else
-			    vote(chip->ufcs_not_allow_votable, PLC_SOC_VOTER, false, 0, false);
-			break;
-		case PLC_ITEM_DISCHG_RETRY:
-			vote(chip->ufcs_disable_votable, PLC_RETRY_VOTER, true, 1, false);
 			break;
 		default:
 			break;
@@ -5364,12 +5501,14 @@ static void oplus_ufcs_subscribe_plc_topic(struct oplus_mms *topic,
 		return;
 	}
 
-	rc = oplus_mms_get_item_data(chip->plc_topic, PLC_ITEM_SUPPORT, &data, true);
-	if (rc >= 0)
-		chip->plc_support = data.intval;
 	rc = oplus_mms_get_item_data(chip->plc_topic, PLC_ITEM_STATUS, &data, true);
 	if (rc >= 0)
 		chip->plc_status = data.intval;
+
+	chip->opp = oplus_plc_register_protocol(chip->plc_topic,
+		&g_plc_protocol_desc, chip->dev->of_node, chip);
+	if (chip->opp == NULL)
+		chg_err("register ufcs plc protocol error");
 }
 
 static int oplus_ufcs_update_online(struct oplus_mms *mms,
@@ -6633,6 +6772,7 @@ static int oplus_ufcs_event_notifier_call(struct notifier_block *nb, unsigned lo
 	switch (val) {
 	case UFCS_NOTIFY_SOURCE_HW_RESET:
 		chg_info("source hard reset\n");
+		chip->handshake_ok = false;
 		schedule_work(&chip->force_exit_work);
 		break;
 	case UFCS_NOTIFY_CABLE_HW_RESET:
@@ -6643,6 +6783,7 @@ static int oplus_ufcs_event_notifier_call(struct notifier_block *nb, unsigned lo
 		break;
 	case UFCS_NOTIFY_EXIT:
 		chg_info("exit ufcs mode\n");
+		chip->handshake_ok = false;
 		schedule_work(&chip->soft_exit_work);
 		if (v != NULL && (*(int *)v == UFCS_NOTIFY_EXIT_BY_CRASH)) {
 			chip->prot_crash = true;
@@ -6831,6 +6972,7 @@ static int oplus_ufcs_probe(struct platform_device *pdev)
 	chip->dev = &pdev->dev;
 	platform_set_drvdata(pdev, chip);
 	chip->reset_adapter = false;
+	chip->handshake_ok = false;
 	init_completion(&chip->reset_abnormal_ack);
 
 	oplus_ufcs_parse_dt(chip);
@@ -6981,6 +7123,7 @@ static int oplus_ufcs_remove(struct platform_device *pdev)
 		oplus_ufcs_dpdm_switch_virq_unreg(chip);
 	if (chip->cp_ic)
 		oplus_ufcs_cp_virq_unreg(chip);
+	oplus_plc_release_protocol(chip->plc_topic, chip->opp);
 	if (!IS_ERR_OR_NULL(chip->cpa_subs))
 		oplus_mms_unsubscribe(chip->cpa_subs);
 	if (!IS_ERR_OR_NULL(chip->wired_subs))

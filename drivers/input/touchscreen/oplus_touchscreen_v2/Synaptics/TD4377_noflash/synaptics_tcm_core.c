@@ -694,6 +694,7 @@ static int syna_parse_report(struct syna_tcm_hcd *tcm_hcd)
 		case TOUCH_REPORT_GESTURE_UNICODE:
 		case TOUCH_REPORT_GESTURE_VEE:
 		case TOUCH_REPORT_GESTURE_TRIANGLE:
+		case TOUCH_GESTURE_SINGLE_TAP:
 			bits = config_data[idx++];
 			retval = syna_get_report_data(tcm_hcd, offset, bits, &data);
 			if (retval < 0) {
@@ -1079,7 +1080,7 @@ static int syna_set_gesture_report_config(struct syna_tcm_hcd *tcm_hcd)
 	unsigned int idx = 0;
 	unsigned int length;
 	struct touch_hcd *touch_hcd = tcm_hcd->touch_hcd;
-
+	struct touchpanel_data *ts = spi_get_drvdata(tcm_hcd->s_client);
 	TPD_DEBUG("%s: set gesture report\n", __func__);
 	length = le2_to_uint(tcm_hcd->app_info.max_touch_report_config_size);
 
@@ -1116,6 +1117,10 @@ static int syna_set_gesture_report_config(struct syna_tcm_hcd *tcm_hcd)
 	touch_hcd->out.buf[idx++] = TOUCH_REPORT_GESTURE_VEE;
 	touch_hcd->out.buf[idx++] = 1;
 	touch_hcd->out.buf[idx++] = TOUCH_REPORT_GESTURE_TRIANGLE;
+	if (ts->incell_aod_gesture_support) {
+		touch_hcd->out.buf[idx++] = 1;
+		touch_hcd->out.buf[idx++] = TOUCH_GESTURE_SINGLE_TAP;
+	}
 	touch_hcd->out.buf[idx++] = 1;
 	touch_hcd->out.buf[idx++] = TOUCH_PAD_TO_NEXT_BYTE;
 	touch_hcd->out.buf[idx++] = TOUCH_REPORT_GESTURE_INFO;
@@ -1756,6 +1761,10 @@ static int syna_tcm_raw_write(struct syna_tcm_hcd *tcm_hcd,
 	unsigned int chunk_space;
 	unsigned int xfer_length;
 	unsigned int remaining_length;
+
+	if (length == 0) {
+		return 0;
+	}
 
 	remaining_length = length;
 
@@ -3038,6 +3047,15 @@ static int syna_tcm_set_gesture_mode(struct syna_tcm_hcd *tcm_hcd, bool enable)
 				TPD_INFO("Failed to set dynamic gesture config\n");
 				return retval;
 			}
+			if (ts->incell_aod_gesture_support) {
+				retval = syna_tcm_set_dynamic_config(tcm_hcd,
+								DC_GESTURE_MASK,
+								0xFFFF);
+				if (retval < 0) {
+					TPD_INFO("%s: Failed to set dynamic gesture mask config\n", __func__);
+					return retval;
+				}
+			}
 		}
 	}
 
@@ -3049,6 +3067,64 @@ static int syna_tcm_set_gesture_mode(struct syna_tcm_hcd *tcm_hcd, bool enable)
 		}
 	}
 
+	return retval;
+}
+
+static int syna_tcm_set_aod_mode(struct syna_tcm_hcd *tcm_hcd, bool enable)
+{
+	int retval = 0;
+	unsigned short config;
+
+
+	retval = syna_tcm_get_dynamic_config(tcm_hcd, DC_IN_WAKEUP_GESTURE_MODE, &config);
+	if (retval < 0) {
+		TPD_INFO("Failed to get dynamic config\n");
+		return retval;
+	}
+
+	TPD_DEBUG("config id is %d, enable: %d\n", config, enable);
+	TPD_DEBUG("aod enable: %d\n", enable);
+
+	if (enable) {
+		if (!config) {
+			retval = syna_set_input_reporting(tcm_hcd, true);
+			if (retval < 0) {
+				TPD_INFO("Failed to set input reporting\n");
+				return retval;
+			}
+			retval = syna_tcm_set_dynamic_config(tcm_hcd, DC_IN_WAKEUP_GESTURE_MODE, true);
+			if (retval < 0) {
+				TPD_INFO("Failed to set dynamic aod gesture config\n");
+				return retval;
+			}
+			retval = syna_tcm_set_dynamic_config(tcm_hcd,
+						     DC_GESTURE_MASK,
+						     0xFFFF);
+			if (retval < 0) {
+				TPD_INFO("%s: Failed to set dynamic gesture mask config\n", __func__);
+				return retval;
+			}
+		}
+	} else {
+			retval = syna_tcm_identify(tcm_hcd, true);
+			if (retval < 0) {
+				TPD_INFO("Failed to do identification\n");
+				return retval;
+			}
+			retval = syna_set_input_reporting(tcm_hcd, false);
+			if (retval < 0) {
+				TPD_INFO("Failed to set input reporting\n");
+				return retval;
+			}
+
+			retval = syna_tcm_set_dynamic_config(tcm_hcd, DC_IN_WAKEUP_GESTURE_MODE, false);
+			if (retval < 0) {
+				TPD_INFO("Failed to set dynamic gesture config\n");
+				return retval;
+			}
+			/*enable_irq(tcm_hcd->s_client->irq);*/
+			TPD_INFO("%s: EXIT MODE_AOD \n", __func__);
+	}
 	return retval;
 }
 
@@ -3272,6 +3348,12 @@ static int syna_mode_switch(void *chip_data, work_mode mode, int flag)
 		ret = syna_tcm_set_gesture_mode(tcm_hcd, flag);
 		if (ret < 0) {
 			TPD_INFO("%s:Failed to set gesture mode\n", __func__);
+		}
+		break;
+	case MODE_INCELL_AOD:
+		ret = syna_tcm_set_aod_mode(tcm_hcd, flag);
+		if (ret < 0) {
+			TPD_INFO("%s:Failed to set aod mode\n", __func__);
 		}
 		break;
 	case MODE_GLOVE:
@@ -3535,6 +3617,9 @@ static int syna_get_gesture_info(void *chip_data, struct gesture_info *gesture)
 	switch (touch_data->lpwg_gesture) {
 	case DTAP_DETECT:
 		gesture->gesture_type = DOU_TAP;
+		break;
+	case STAP_DETECT:
+		gesture->gesture_type = SINGLE_TAP;
 		break;
 	case CIRCLE_DETECT:
 		gesture->gesture_type = CIRCLE_GESTURE;

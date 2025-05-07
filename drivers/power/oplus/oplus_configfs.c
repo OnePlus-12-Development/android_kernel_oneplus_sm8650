@@ -485,11 +485,13 @@ static ssize_t cc_report_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(cc_report);
 
+#define ECO_DESIGN_UPDATE_TIME_DEBUG_FLAG 0xffff
 static ssize_t battery_sn_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int len = 0;
 	int ret = 0;
 	char batt_sn[OPLUS_BATT_SERIAL_NUM_SIZE * 2] = {"\0"};
+	char eco_design_update_time[] = {"debugTime"};
 	struct oplus_chg_chip *chip = NULL;
 
 	chip = (struct oplus_chg_chip *)dev_get_drvdata(oplus_battery_dir);
@@ -501,8 +503,13 @@ static ssize_t battery_sn_show(struct device *dev, struct device_attribute *attr
 	ret = oplus_gauge_get_bat_info_sn(batt_sn, sizeof(batt_sn));
 	if (ret < 0)
 		chg_err("get battery sn error");
-	else
+	else {
+		if (chip->debug_battery_sn_data == ECO_DESIGN_UPDATE_TIME_DEBUG_FLAG) {
+			len = sprintf(buf, "%s\n", eco_design_update_time);
+			return len;
+		}
 		len = sprintf(buf, "%s\n", batt_sn);
+	}
 
 	if (!chip->debug_battery_sn_data) {
 		return len;
