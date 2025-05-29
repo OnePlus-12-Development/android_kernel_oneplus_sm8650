@@ -2258,6 +2258,7 @@ static void do_sgm41512_threaded_irq_work(struct work_struct *data)
 			oplus_chg_wake_update_work();
 		}
 
+		cancel_delayed_work_sync(&charger_modefy_work);
 		sgm41512_enable_chg_type_det(chip->pwr_gd);
 		if (chip->enable_headset_plugin_limit) {
 			if (chip->pwr_gd) {

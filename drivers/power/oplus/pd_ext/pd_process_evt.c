@@ -108,6 +108,7 @@ static const char *const pd_ext_msg_name[] = {
 	"pps_status",
 	"ci",
 	"cc",
+	"snk_cap_ext",
 };
 
 static inline void print_ext_msg_event(struct tcpc_device *tcpc, uint8_t msg)

@@ -1142,11 +1142,23 @@ static int focal_get_fw_version(void *chip_data)
 static void focal_get_differ_version(void *chip_data)
 {
 	u8 differ_version = 0;
+	int tx_num = 0;
+	int rx_num = 0;
+	u16 buf_len = 0;
 	struct chip_data_ft3683g *ts_data = (struct chip_data_ft3683g *)chip_data;
+
+	tx_num = ts_data->hw_res->tx_num;
+	rx_num = ts_data->hw_res->rx_num;
+	if (tx_num > FTS_MAX_TX_NUM)
+		tx_num = FTS_MAX_TX_NUM;
+	if (rx_num > FTS_MAX_RX_NUM)
+		rx_num = FTS_MAX_RX_NUM;
+
+	buf_len = 154 + (tx_num * rx_num) * 2 + (tx_num + rx_num) * 4 + 8 * rx_num * 2;
 
 	fts_read_reg(FTS_REG_DIFFER_VERSION, &differ_version);
 	if (differ_version) {
-		ts_data->buffer_len = FTS_MAX_POINTS_SNR_LENGTH_V2;
+		ts_data->buffer_len = buf_len;
 		ts_data->tp_differ_version = FTS_DIFFER_VERSION_V2;
 		TPD_INFO("ts tp differ version v2.\n");
 	} else {

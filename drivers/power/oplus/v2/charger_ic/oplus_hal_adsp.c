@@ -45,6 +45,7 @@
 #include <oplus_chg_cpa.h>
 #include <ufcs_class.h>
 #include <oplus_chg_monitor.h>
+#include <oplus_chg_plc.h>
 
 #define BCC_TYPE_IS_SVOOC 1
 #define BCC_TYPE_IS_VOOC 0
@@ -7982,6 +7983,26 @@ static int oplus_chg_wls_aicl_rerun(struct oplus_chg_ic_dev *ic_dev)
 }
 
 #ifdef OPLUS_FEATURE_CHG_BASIC
+
+static int oplus_chg_adsp_set_plc_status(struct battery_chg_dev *bcdev, int status)
+{
+	struct psy_state *pst;
+	int rc;
+
+	if (bcdev == NULL) {
+		chg_err("bcdev is NULL");
+		return -ENODEV;
+	}
+
+	pst = &bcdev->psy_list[PSY_TYPE_USB];
+
+	rc = write_property_id(bcdev, pst, USB_SET_PLC_STATUS, status);
+	if (rc)
+		chg_err("set plc status fail, rc=%d\n", rc);
+
+	return rc;
+}
+
 static void *oplus_chg_8350_buck_get_func(struct oplus_chg_ic_dev *ic_dev, enum oplus_chg_ic_func func_id)
 {
 	void *func = NULL;
@@ -10858,6 +10879,63 @@ static void oplus_adsp_get_regmap_work(struct work_struct *work)
 		}
 	}
 }
+
+static void oplus_chg_adsp_plc_status_update_work(struct work_struct *work)
+{
+	struct battery_chg_dev *bcdev =
+		container_of(work, struct battery_chg_dev, plc_status_update_work);
+	union mms_msg_data data = { 0 };
+	int rc;
+
+	rc = oplus_mms_get_item_data(bcdev->plc_topic, PLC_ITEM_STATUS, &data, false);
+	if (rc < 0) {
+		chg_err("get plc status error, rc=%d\n", rc);
+		return;
+	}
+	(void)oplus_chg_adsp_set_plc_status(bcdev, data.intval);
+}
+
+static void oplus_chg_adsp_plc_subs_callback(struct mms_subscribe *subs,
+					     enum mms_msg_type type, u32 id, bool sync)
+{
+	struct battery_chg_dev *bcdev = subs->priv_data;
+
+	switch (type) {
+	case MSG_TYPE_ITEM:
+		switch (id) {
+		case PLC_ITEM_STATUS:
+			schedule_work(&bcdev->plc_status_update_work);
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+static void oplus_chg_adsp_subscribe_plc_topic(struct oplus_mms *topic,
+					       void *prv_data)
+{
+	struct battery_chg_dev *bcdev = prv_data;
+	union mms_msg_data data = { 0 };
+	int rc;
+
+	bcdev->plc_topic = topic;
+	bcdev->plc_subs = oplus_mms_subscribe(bcdev->plc_topic, bcdev,
+					      oplus_chg_adsp_plc_subs_callback,
+					      "adsp");
+	if (IS_ERR_OR_NULL(bcdev->plc_subs)) {
+		chg_err("subscribe plc topic error, rc=%ld\n",
+			PTR_ERR(bcdev->plc_subs));
+		return;
+	}
+
+	rc = oplus_mms_get_item_data(bcdev->plc_topic, PLC_ITEM_STATUS, &data, true);
+	if (rc >= 0)
+		(void)oplus_chg_adsp_set_plc_status(bcdev, data.intval);
+}
 #endif /* OPLUS_FEATURE_CHG_BASIC */
 
 static int battery_chg_probe(struct platform_device *pdev)
@@ -10948,6 +11026,7 @@ static int battery_chg_probe(struct platform_device *pdev)
 	init_completion(&bcdev->fw_update_ack);
 	INIT_WORK(&bcdev->subsys_up_work, battery_chg_subsys_up_work);
 	INIT_WORK(&bcdev->usb_type_work, battery_chg_update_usb_type_work);
+	INIT_WORK(&bcdev->plc_status_update_work, oplus_chg_adsp_plc_status_update_work);
 #ifdef OPLUS_FEATURE_CHG_BASIC
 	INIT_DELAYED_WORK(&bcdev->adsp_voocphy_status_work, oplus_adsp_voocphy_status_func);
 	INIT_DELAYED_WORK(&bcdev->unsuspend_usb_work, oplus_unsuspend_usb_work);
@@ -11092,6 +11171,8 @@ static int battery_chg_probe(struct platform_device *pdev)
 	if (rc < 0)
 		goto error;
 
+	oplus_mms_wait_topic("plc", oplus_chg_adsp_subscribe_plc_topic, bcdev);
+
 	INIT_DELAYED_WORK(&bcdev->get_regmap_work, oplus_adsp_get_regmap_work);
 	schedule_delayed_work(&bcdev->get_regmap_work, 0);
 	mod_delayed_work(system_highpri_wq, &bcdev->ctrl_lcm_frequency, 0);
@@ -11113,6 +11194,9 @@ static int battery_chg_remove(struct platform_device *pdev)
 {
 	struct battery_chg_dev *bcdev = platform_get_drvdata(pdev);
 	int rc;
+
+	if (!IS_ERR_OR_NULL(bcdev->plc_subs))
+		oplus_mms_unsubscribe(bcdev->plc_subs);
 
 	device_init_wakeup(bcdev->dev, false);
 	debugfs_remove_recursive(bcdev->debugfs_dir);

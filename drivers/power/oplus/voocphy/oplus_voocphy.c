@@ -35,7 +35,7 @@
 #include "../oplus_chg_audio_switch.h"
 
 #define AP_ALLOW_FASTCHG	(1 << 6)
-#define TARGET_VOL_OFFSET_THR	250
+#define TARGET_VOL_OFFSET_THR	1000 /* considering adapter error and adc error, changing from 0.25A to 1A */
 #define DELAY_TEMP_MONITOR_COUNTS		2
 #define trace_oplus_tp_sched_change_ux(x, y)
 #define CHARGER_UP_CPU_FREQ	2000000	//1.8 x 1000 x 1000

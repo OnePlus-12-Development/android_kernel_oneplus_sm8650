@@ -1161,9 +1161,9 @@ int write_data_correction(u8 *pkt, u8 pkt_len, u8 *write_buf, u8 write_len)
 	if (wbit_lowtime_buffer[1][1] < 40) return false;
 	if (wbit_lowtime_buffer[2][1] < 40) return false;
 	memcpy(pkt+2, write_buf, write_len);
-	pkt[wbit_lowtime_buffer[0][1] / 8] ^= temp[ wbit_lowtime_buffer[i][1] % 8];
-	pkt[wbit_lowtime_buffer[1][1] / 8] ^= temp[ wbit_lowtime_buffer[i][1] % 8];
-	pkt[wbit_lowtime_buffer[2][1] / 8] ^= temp[ wbit_lowtime_buffer[i][1] % 8];
+	pkt[wbit_lowtime_buffer[0][1] / 8] ^= temp[ wbit_lowtime_buffer[0][1] % 8];
+	pkt[wbit_lowtime_buffer[1][1] / 8] ^= temp[ wbit_lowtime_buffer[1][1] % 8];
+	pkt[wbit_lowtime_buffer[2][1] / 8] ^= temp[ wbit_lowtime_buffer[2][1] % 8];
 	wdcrc16 = 0;  /* check wdcrc16 */
 	for (j = 0; j < pkt_len-2; j++)
 	  docrc16(pkt[j]);
