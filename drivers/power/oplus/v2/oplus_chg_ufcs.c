@@ -465,6 +465,7 @@ struct oplus_ufcs {
 	bool ufcs_disable;
 	bool ufcs_not_allow;
 	enum oplus_cp_work_mode cp_work_mode;
+	bool oplus_cp_ucp_disable;
 	int emark_imax;
 	int power_imax;
 
@@ -1395,6 +1396,9 @@ static int oplus_ufcs_cp_set_work_mode(struct oplus_ufcs *chip, enum oplus_cp_wo
 		}
 	}
 
+	if (rc >= 0)
+		chip->oplus_cp_ucp_disable = false;
+
 	return rc;
 }
 
@@ -1545,8 +1549,12 @@ static int oplus_ufcs_cp_set_ucp_disable(struct oplus_ufcs *chip, bool disable)
 	if (chip->opp == NULL)
 		return -ENOTSUPP;
 
-	rc = oplus_chg_ic_func(chip->cp_ic, OPLUS_IC_FUNC_CP_SET_UCP_DISABLE, disable);
+	if (chip->oplus_cp_ucp_disable == disable)
+		return 0;
 
+	rc = oplus_chg_ic_func(chip->cp_ic, OPLUS_IC_FUNC_CP_SET_UCP_DISABLE, disable);
+	if (rc >= 0)
+		chip->oplus_cp_ucp_disable = disable;
 	return rc;
 }
 
@@ -3459,8 +3467,10 @@ static void oplus_ufcs_check_low_curr_full(struct oplus_ufcs *chip)
 static void oplus_ufcs_check_timeout(struct oplus_ufcs *chip)
 {
 	unsigned long tmp_time;
-	if (chip->plc_status == PLC_STATUS_ENABLE)
+	if (chip->plc_status == PLC_STATUS_ENABLE) {
+		chip->timer.monitor_jiffies = jiffies;
 		return;
+	}
 	tmp_time = jiffies - chip->timer.monitor_jiffies;
 	chip->timer.monitor_jiffies = jiffies;
 	if (chip->timer.ufcs_max_time_ms <= jiffies_to_msecs(tmp_time)) {
@@ -4325,6 +4335,7 @@ static void oplus_ufcs_current_work(struct work_struct *work)
 		if (chip->vol_set_mv == chip->config.target_vbus_mv) {
 			chip->target_vbus_mv = UFCS_SOURCE_INFO_VOL(chip->src_info) + UFCS_THIRD_IBUS_PLC_THLD;
 		}
+		oplus_ufcs_cp_set_ucp_disable(chip, true);
 		curr_set = PLC_IBUS_MAX;
 	} else {
 		if (chip->oplus_ufcs_adapter) {

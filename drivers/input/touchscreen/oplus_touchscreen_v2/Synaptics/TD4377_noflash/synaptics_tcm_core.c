@@ -3501,6 +3501,8 @@ void syna_fw_version_update(void *chip_data)
 	struct touchpanel_data *ts = spi_get_drvdata(tcm_hcd->s_client);
 	char *fw_ver = NULL;
 
+        tcm_hcd->app_info.customer_config_id[9] = '\0';
+
 	if (strlen(tcm_hcd->app_info.customer_config_id) == 0) {
 		return;
 	}
