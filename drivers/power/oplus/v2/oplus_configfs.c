@@ -3574,6 +3574,53 @@ static ssize_t sili_ic_alg_cfg_store(
 }
 static DEVICE_ATTR_WO(sili_ic_alg_cfg);
 
+static ssize_t non_standard_chg_switch_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct oplus_configfs_device *chip = dev->driver_data;
+	bool val = false;
+
+	if (!chip) {
+		chg_err("chip is NULL\n");
+		return -EINVAL;
+	}
+
+	if (!chip->comm_topic) {
+		chg_err("common_topic not ready\n");
+		return -ENOTSUPP;
+	}
+
+	val = oplus_comm_get_fastchg_check_switch(chip->comm_topic);
+	return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t non_standard_chg_switch_store(struct device *dev, struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	int val = 0;
+	struct oplus_configfs_device *chip = dev->driver_data;
+
+	if (!chip) {
+		chg_err("chip is NULL\n");
+		return -EINVAL;
+	}
+
+	if (!chip->comm_topic) {
+		chg_err("common_topic not ready\n");
+		return -ENOTSUPP;
+	}
+
+	if (kstrtos32(buf, 0, &val)) {
+		chg_err("buf error\n");
+		return -EINVAL;
+	}
+
+	oplus_comm_set_fastchg_check_switch(chip->comm_topic, val);
+
+	chg_info("rus value store, rus switch = %d\n", val);
+	return count;
+}
+static DEVICE_ATTR_RW(non_standard_chg_switch);
+
 static struct device_attribute *oplus_common_attributes[] = {
 	&dev_attr_common,
 	&dev_attr_boot_completed,
@@ -3596,6 +3643,7 @@ static struct device_attribute *oplus_common_attributes[] = {
 	&dev_attr_sili_ic_alg_cfg,
 	&dev_attr_chg_up_limit,
 	&dev_attr_plc,
+	&dev_attr_non_standard_chg_switch,
 	NULL
 };
 

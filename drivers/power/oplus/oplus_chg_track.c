@@ -3854,11 +3854,13 @@ static void oplus_chg_track_record_charger_info(struct oplus_chg_chip *chip, opl
 				  track_status->slow_chg_pct, track_status->slow_chg_watt);
 	}
 
-	index += snprintf(&(p_trigger_data->crux_info[index]),
-			  OPLUS_CHG_TRACK_CURX_INFO_LEN - index, "$$fcl@@%d,%d,%d,%d,%d",
-			  track_status->fcl.one_full_trigger_cnt, track_status->fcl.one_full_trigger_volt,
-			  track_status->fcl.one_full_trigger_curr, track_status->fcl.one_full_trigger_temp,
-			  track_status->fcl.n_full_trigger_cnt);
+	if (index < OPLUS_CHG_TRACK_CURX_INFO_LEN) {
+		index += scnprintf(&(p_trigger_data->crux_info[index]),
+				OPLUS_CHG_TRACK_CURX_INFO_LEN - index, "$$fcl@@%d,%d,%d,%d,%d",
+				track_status->fcl.one_full_trigger_cnt, track_status->fcl.one_full_trigger_volt,
+				track_status->fcl.one_full_trigger_curr, track_status->fcl.one_full_trigger_temp,
+				track_status->fcl.n_full_trigger_cnt);
+	}
 
 	index += snprintf(&(p_trigger_data->crux_info[index]),
 			  OPLUS_CHG_TRACK_CURX_INFO_LEN - index,

@@ -1234,6 +1234,7 @@ static struct oplus_chg_track_chg_abnormal_reason chg_abnormal_reason_table[] = 
 	{ NOTIFY_BAT_OVER_VOL, "batt_over_vol", 0 },
 	{ NOTIFY_BAT_NOT_CONNECT, "batt_no_conn", 0 },
 	{ NOTIFY_BAT_FULL_THIRD_BATTERY, "batt_no_auth", 0 },
+	{ NOTIFY_FASTCHG_CHECK_FAIL, "non_standard_charger", 0 },
 };
 
 static struct oplus_chg_track_cool_down_stats cool_down_stats_table[] = {
@@ -5227,6 +5228,9 @@ oplus_chg_track_check_chg_abnormal(struct oplus_monitor *monitor,
 		oplus_chg_track_get_chg_abnormal_reason_info(
 			NOTIFY_BAT_FULL_THIRD_BATTERY, track_status);
 	}
+
+	if (notify_code & (1 << NOTIFY_FASTCHG_CHECK_FAIL))
+		oplus_chg_track_get_chg_abnormal_reason_info(NOTIFY_FASTCHG_CHECK_FAIL, track_status);
 
 	chg_debug("track_notify_code:0x%x, chager_notify_code:0x%x, abnormal_reason[%s]\n",
 		notify_code, monitor->notify_code,

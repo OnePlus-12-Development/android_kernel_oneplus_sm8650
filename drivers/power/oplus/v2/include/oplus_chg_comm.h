@@ -165,6 +165,8 @@ int oplus_comm_get_wired_ffc_cutoff_fv(struct oplus_mms *topic, int step,
 int oplus_comm_get_wired_ffc_step_max(struct oplus_mms *topic);
 int oplus_comm_get_wired_aging_ffc_version(struct oplus_mms *topic);
 int oplus_comm_get_dec_vol(struct oplus_mms *topic, int *fv_dec, int *wired_ffc_dec, int *wls_ffc_dec);
+int oplus_comm_get_fastchg_check_switch(struct oplus_mms *topic);
+void oplus_comm_set_fastchg_check_switch(struct oplus_mms *topic, bool val);
 bool oplus_comm_get_boot_completed(void);
 int oplus_comm_get_bms_heat_temp_compensation(struct oplus_mms *topic);
 void oplus_comm_set_bms_heat_temp_compensation(struct oplus_mms *topic, int bms_heat_temp_compensation);

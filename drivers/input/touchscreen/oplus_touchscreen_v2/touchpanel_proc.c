@@ -1041,6 +1041,7 @@ static ssize_t proc_aiunit_game_info_write(struct file *file,
 		goto write_exit;
 	}
 	tp_copy_from_user(buf, PAGESIZE * 6, buffer, count, PAGESIZE * 6 - 1);
+	buf[PAGESIZE * 6 - 1] = '\0';
 	memset(tp_set_aiunit_game_info, 0, MAX_AIUNIT_SET_NUM * sizeof(struct tp_aiunit_game_info));
 	memset(tp_get_aiunit_game_info, 0, MAX_AIUNIT_GET_NUM * sizeof(struct tp_aiunit_game_info));
 	get_all_buff = &buf[0];
