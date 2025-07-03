@@ -7951,9 +7951,6 @@ static void dwc3_host_complete(struct device *dev)
 {
 	int ret = 0;
 
-	if (strcmp(dev_driver_string(dev->parent), "msm-dwc3") != 0)
-		return;
-
 	if (dev->power.direct_complete) {
 		ret = pm_runtime_resume(dev);
 		if (ret < 0) {
@@ -7965,9 +7962,6 @@ static void dwc3_host_complete(struct device *dev)
 
 static int dwc3_host_prepare(struct device *dev)
 {
-	if (strcmp(dev_driver_string(dev->parent), "msm-dwc3") != 0)
-		return 0;
-
 	/*
 	 * It is recommended to use the PM prepare callback to handle situations
 	 * where the device is already runtime suspended, in order to avoid
