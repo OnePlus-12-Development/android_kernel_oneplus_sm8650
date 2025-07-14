@@ -31,7 +31,6 @@ jobs:
         max-size: 1536M
     - name: Setup LLVM
       run: |
-        sudo apt update && sudo apt upgrade -y
         sudo apt-get install curl bison flex make binutils dwarves git lld pahole zip perl make gcc python3 python-is-python3 bc libssl-dev libelf-dev clang -y
     - name: Configure
       run: make CC="ccache clang" LD=ld.lld HOSTCC="ccache clang" O=out KCFLAGS+=-Wno-error gki_defconfig vendor/pineapple_GKI.config vendor/oplus/pineapple_GKI.config
