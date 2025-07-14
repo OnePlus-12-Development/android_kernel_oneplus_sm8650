@@ -51,4 +51,4 @@
 
 #include "cputime.c"
 #include "deadline.c"
-
+#include "hmbird_sched_proc_main.c"
