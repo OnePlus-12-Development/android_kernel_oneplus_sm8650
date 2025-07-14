@@ -1263,6 +1263,29 @@ config CRYPTO_LZ4
 
 	  See https://github.com/lz4/lz4 for further information.
 
+config CRYPTO_LZ4K
+	tristate "LZ4K"
+	select CRYPTO_ALGAPI
+	select CRYPTO_ACOMP2
+	select LZ4_COMPRESS
+	select LZ4_DECOMPRESS
+	help
+	  LZ4K compression algorithm
+
+	  See https://github.com/lz4/lz4 for further information.
+
+config CRYPTO_LZ4KD
+	tristate "LZ4"
+	select CRYPTO_ALGAPI
+	select CRYPTO_ACOMP2
+	select LZ4_COMPRESS
+	select LZ4_DECOMPRESS
+	help
+	  LZ4KD compression algorithm
+
+	  See https://github.com/lz4/lz4 for further information.
+
+
 config CRYPTO_LZ4HC
 	tristate "LZ4HC"
 	select CRYPTO_ALGAPI
