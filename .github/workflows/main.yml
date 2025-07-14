@@ -15,15 +15,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set reusable strings
-      # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
-      id: strings
-      shell: bash
-      run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
-        sudo rm -rf /usr/share/rust /usr/local/share/chromium /usr/lib/firefox /usr/local/share/gecko_driver /usr/share/mysql* /opt/mssql-tools /usr/local/sqlpackage /usr/share/*gradle* /usr/bin/gradle /usr/share/*maven* /usr/lib/jvm/ /usr/local/graalvm /usr/share/java/selenium-server*.jar /usr/local/lib/android /home/runner/.cargo /home/runner/.rustup  /opt/microsoft/powershell /opt/hostedtoolcache /opt/pipx /usr/share/vcpkg  /usr/share/dotnet /home/runner/.dotnet /usr/share/firebird* /opt/hhvm /usr/share/sbt /var/cache/snapd /home/runner/snap /usr/share/swift /usr/local/julia* /usr/bin/julia /usr/share/kotlinc /usr/bin/kotlin*  /usr/local/lib/node_modules /usr/share/php*
-        sudo df -h
     - uses: hendrikmuhs/ccache-action@v1.2
       with:
         create-symlink: true
