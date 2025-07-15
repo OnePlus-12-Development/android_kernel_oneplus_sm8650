@@ -1292,7 +1292,7 @@ static int snd_usb_mbox3_boot_quirk(struct usb_device *dev)
 		dev_dbg(&dev->dev, "error usb_get_descriptor: %d\n", err);
 	if (new_device_descriptor->bNumConfigurations > dev->descriptor.bNumConfigurations)
 		dev_dbg(&dev->dev, "error too large bNumConfigurations: %d\n",
-			new_device->descriptor.bNumConfigurations);
+			new_device_descriptor->bNumConfigurations);
 	else
 		memcpy(&dev->descriptor, &new_device_descriptor, sizeof(dev->descriptor));
 
