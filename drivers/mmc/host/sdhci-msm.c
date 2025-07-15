@@ -1938,7 +1938,7 @@ static int sdhci_msm_set_vmmc(struct mmc_host *mmc)
 	if (IS_ERR(mmc->supply.vmmc))
 		return 0;
 
-	msm_config_vmmc_regulator(mmc, hpm);
+	msm_config_vmmc_regulator(mmc, false);
 
 	return mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, mmc->ios.vdd);
 }
@@ -2627,8 +2627,7 @@ static void sdhci_msm_handle_pwr_irq(struct sdhci_host *host, int irq)
 	}
 
 	if (pwr_state) {
-		ret = sdhci_msm_set_vmmc(msm_host, mmc,
-					 pwr_state & REQ_BUS_ON);
+		ret = sdhci_msm_set_vmmc(mmc);
 		if (!ret)
 			ret = sdhci_msm_set_vqmmc(msm_host, mmc,
 					pwr_state & REQ_BUS_ON);
