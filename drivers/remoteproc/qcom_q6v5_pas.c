@@ -2575,7 +2575,6 @@ static const struct adsp_data sm6350_cdsp_resource = {
 		"mx",
 		NULL
 	},
-	.load_state = "cdsp",
 	.ssr_name = "cdsp",
 	.sysmon_name = "cdsp",
 	.ssctl_id = 0x17,
