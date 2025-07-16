@@ -679,7 +679,7 @@ static void set_tlb_ubc_flush_pending(struct mm_struct *mm, bool writable)
 	struct tlbflush_unmap_batch *tlb_ubc = &current->tlb_ubc;
 	int batch, nbatch;
 
-	arch_tlbbatch_add_mm(&tlb_ubc->arch, mm);
+	arch_tlbbatch_flush(&tlb_ubc->arch, mm);
 	tlb_ubc->flush_required = true;
 
 	/*
