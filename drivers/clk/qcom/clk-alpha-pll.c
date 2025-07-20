@@ -445,26 +445,15 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 		val |= config->pre_div_val;
 		val |= config->vco_val;
 		val |= config->alpha_en_mask;
-
-<<<<<<< HEAD
 		mask = config->main_output_mask;
 		mask |= config->aux_output_mask;
 		mask |= config->aux2_output_mask;
 		mask |= config->early_output_mask;
 		mask |= config->pre_div_mask;
+		mask |= config->post_div_mask;
 		mask |= config->vco_mask;
 		mask |= config->alpha_en_mask;
-=======
-	mask = config->main_output_mask;
-	mask |= config->aux_output_mask;
-	mask |= config->aux2_output_mask;
-	mask |= config->early_output_mask;
-	mask |= config->pre_div_mask;
-	mask |= config->post_div_mask;
-	mask |= config->vco_mask;
-	mask |= config->alpha_en_mask;
-	mask |= config->alpha_mode_mask;
->>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
+		mask |= config->alpha_mode_mask;
 
 		regmap_update_bits(regmap, PLL_USER_CTL(pll), mask, val);
 	}
@@ -2019,17 +2008,12 @@ clk_trion_pll_postdiv_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 	struct regmap *regmap = pll->clkr.regmap;
 	u32 i, div = 1, val;
 
-<<<<<<< HEAD
 	if (!pll->post_div_table) {
 		pr_err("Missing the post_div_table for the PLL\n");
 		return -EINVAL;
 	}
 
 	regmap_read(regmap, PLL_USER_CTL(pll), &val);
-=======
-	if (regmap_read(regmap, PLL_USER_CTL(pll), &val))
-		return 0;
->>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
 
 	val >>= pll->post_div_shift;
 	val &= PLL_POST_DIV_MASK(pll);
