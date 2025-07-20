@@ -261,7 +261,11 @@ static int qcom_llcc_core_setup(struct regmap *llcc_bcast_regmap)
 	 * Configure interrupt enable registers such that Tag, Data RAM related
 	 * interrupts are propagated to interrupt controller for servicing
 	 */
+<<<<<<< HEAD
 	ret = regmap_update_bits(llcc_bcast_regmap, CMN_INTERRUPT_0_ENABLE,
+=======
+	ret = regmap_update_bits(llcc_bcast_regmap, drv->edac_reg_offset->cmn_interrupt_0_enable,
+>>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
 				 TRP0_INTERRUPT_ENABLE,
 				 TRP0_INTERRUPT_ENABLE);
 	if (ret)
@@ -279,7 +283,11 @@ static int qcom_llcc_core_setup(struct regmap *llcc_bcast_regmap)
 	if (ret)
 		return ret;
 
+<<<<<<< HEAD
 	ret = regmap_update_bits(llcc_bcast_regmap, CMN_INTERRUPT_0_ENABLE,
+=======
+	ret = regmap_update_bits(llcc_bcast_regmap, drv->edac_reg_offset->cmn_interrupt_0_enable,
+>>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
 				 DRP0_INTERRUPT_ENABLE,
 				 DRP0_INTERRUPT_ENABLE);
 	if (ret)

@@ -170,11 +170,17 @@ int slim_do_transfer(struct slim_controller *ctrl, struct slim_msg_txn *txn)
 	}
 
 	ret = ctrl->xfer_msg(ctrl, txn);
+<<<<<<< HEAD
 
 	if (ret == -ETIMEDOUT)
 		slim_free_txn_tid(ctrl, txn);
 
 	if (!ret && need_tid && !txn->msg->comp) {
+=======
+	if (ret == -ETIMEDOUT) {
+		slim_free_txn_tid(ctrl, txn);
+	} else if (!ret && need_tid && !txn->msg->comp) {
+>>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
 		unsigned long ms = txn->rl + HZ;
 
 		timeout = wait_for_completion_timeout(txn->comp,
