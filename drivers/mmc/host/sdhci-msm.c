@@ -179,9 +179,13 @@
 /* Timeout value to avoid infinite waiting for pwr_irq */
 #define MSM_PWR_IRQ_TIMEOUT_MS 5000
 
+/* Max load for eMMC Vdd supply */
+#define MMC_VMMC_MAX_LOAD_UA	570000
+
 /* Max load for eMMC Vdd-io supply */
 #define MMC_VQMMC_MAX_LOAD_UA	325000
 
+<<<<<<< HEAD
 /*
  * Due to level shifter insertion, HS mode frequency is reduced to 37.5MHz
  * but clk's driver supply 37MHz only and uses ceil ops. So vote for
@@ -200,6 +204,13 @@
 			ipc_log_string(host->sdhci_msm_ipc_log_ctx,	\
 					"%s: " fmt, __func__, ##__VA_ARGS__);\
 	} while (0)
+=======
+/* Max load for SD Vdd supply */
+#define SD_VMMC_MAX_LOAD_UA	800000
+
+/* Max load for SD Vdd-io supply */
+#define SD_VQMMC_MAX_LOAD_UA	22000
+>>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
 
 #define msm_host_readl(msm_host, host, offset) \
 	msm_host->var_ops->msm_readl_relaxed(host, offset)
@@ -1776,6 +1787,7 @@ static int sdhci_msm_set_pincfg(struct sdhci_msm_host *msm_host, bool level)
 	return ret;
 }
 
+<<<<<<< HEAD
 static int sdhci_msm_dt_parse_hsr_info(struct device *dev,
 		struct sdhci_msm_host *msm_host)
 
@@ -1897,9 +1909,49 @@ out:
 }
 
 static int sdhci_msm_set_vmmc(struct mmc_host *mmc)
+=======
+static void msm_config_vmmc_regulator(struct mmc_host *mmc, bool hpm)
+{
+	int load;
+
+	if (!hpm)
+		load = 0;
+	else if (!mmc->card)
+		load = max(MMC_VMMC_MAX_LOAD_UA, SD_VMMC_MAX_LOAD_UA);
+	else if (mmc_card_mmc(mmc->card))
+		load = MMC_VMMC_MAX_LOAD_UA;
+	else if (mmc_card_sd(mmc->card))
+		load = SD_VMMC_MAX_LOAD_UA;
+	else
+		return;
+
+	regulator_set_load(mmc->supply.vmmc, load);
+}
+
+static void msm_config_vqmmc_regulator(struct mmc_host *mmc, bool hpm)
+{
+	int load;
+
+	if (!hpm)
+		load = 0;
+	else if (!mmc->card)
+		load = max(MMC_VQMMC_MAX_LOAD_UA, SD_VQMMC_MAX_LOAD_UA);
+	else if (mmc_card_sd(mmc->card))
+		load = SD_VQMMC_MAX_LOAD_UA;
+	else
+		return;
+
+	regulator_set_load(mmc->supply.vqmmc, load);
+}
+
+static int sdhci_msm_set_vmmc(struct sdhci_msm_host *msm_host,
+			      struct mmc_host *mmc, bool hpm)
+>>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
 {
 	if (IS_ERR(mmc->supply.vmmc))
 		return 0;
+
+	msm_config_vmmc_regulator(mmc, hpm);
 
 	return mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, mmc->ios.vdd);
 }
@@ -1912,6 +1964,8 @@ static int msm_toggle_vqmmc(struct sdhci_msm_host *msm_host,
 
 	if (msm_host->vqmmc_enabled == level)
 		return 0;
+
+	msm_config_vqmmc_regulator(mmc, level);
 
 	if (level) {
 		/* Set the IO voltage regulator to default voltage level */
@@ -2586,7 +2640,8 @@ static void sdhci_msm_handle_pwr_irq(struct sdhci_host *host, int irq)
 	}
 
 	if (pwr_state) {
-		ret = sdhci_msm_set_vmmc(mmc);
+		ret = sdhci_msm_set_vmmc(msm_host, mmc,
+					 pwr_state & REQ_BUS_ON);
 		if (!ret)
 			ret = sdhci_msm_set_vqmmc(msm_host, mmc,
 					pwr_state & REQ_BUS_ON);
