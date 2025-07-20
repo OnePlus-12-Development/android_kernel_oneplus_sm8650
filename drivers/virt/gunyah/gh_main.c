@@ -106,6 +106,7 @@ static void gh_notif_vm_exited(struct gh_vm *vm,
 		gh_notify_clients(vm, GH_VM_CRASH);
 		break;
 	}
+
 	vm->status.vm_status = GH_RM_VM_STATUS_EXITED;
 	gh_wakeup_all_vcpus(vm->vmid);
 	wake_up_interruptible(&vm->vm_status_wait);
@@ -153,6 +154,7 @@ static void gh_vm_cleanup(struct gh_vm *vm)
 	case GH_RM_VM_STATUS_EXITED:
 	case GH_RM_VM_STATUS_RUNNING:
 	case GH_RM_VM_STATUS_READY:
+		gh_notify_clients(vm, GH_VM_EXITED);
 		ret = gh_rm_unpopulate_hyp_res(vmid, vm->fw_name);
 		if (ret)
 			pr_warn("Failed to unpopulate hyp resources: %d\n", ret);

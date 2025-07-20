@@ -1274,9 +1274,13 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 	irq_hw_number_t irq = 0;
 	u32 intr_target_mask = GENMASK(2, 0);
 	unsigned long flags;
+<<<<<<< HEAD
 	u32 offset = 0;
 	bool was_enabled;
+	u32 val;
+=======
 	u32 val, oldval;
+>>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
 
 	if (msm_gpio_needs_dual_edge_parent_workaround(d, type)) {
 		set_bit(d->hwirq, pctrl->dual_edge_irqs);

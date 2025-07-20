@@ -491,9 +491,13 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_sdhci_get_cd);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mmc_gpio_cd_irqt);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_trigger_vendor_lmk_kill);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_filemap_map_pages_range);
+<<<<<<< HEAD
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_folio_referenced_check_bypass);
+=======
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_vprintk_store);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_folio_referenced_check_bypass);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_calculate_totalreserve_pages);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_drain_all_pages_bypass);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pageset_update);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mempool_alloc_skip_wait);
+>>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35

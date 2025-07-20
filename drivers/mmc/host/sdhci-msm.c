@@ -3,7 +3,7 @@
  * drivers/mmc/host/sdhci-msm.c - Qualcomm SDHCI Platform driver
  *
  * Copyright (c) 2013-2014,2020. The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2024, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -180,11 +180,12 @@
 #define MSM_PWR_IRQ_TIMEOUT_MS 5000
 
 /* Max load for eMMC Vdd supply */
-#define MMC_VMMC_MAX_LOAD_UA	800000
+#define MMC_VMMC_MAX_LOAD_UA	570000
 
 /* Max load for eMMC Vdd-io supply */
-#define MMC_VQMMC_MAX_LOAD_UA	22000
+#define MMC_VQMMC_MAX_LOAD_UA	325000
 
+<<<<<<< HEAD
 /*
  * Due to level shifter insertion, HS mode frequency is reduced to 37.5MHz
  * but clk's driver supply 37MHz only and uses ceil ops. So vote for
@@ -203,6 +204,13 @@
 			ipc_log_string(host->sdhci_msm_ipc_log_ctx,	\
 					"%s: " fmt, __func__, ##__VA_ARGS__);\
 	} while (0)
+=======
+/* Max load for SD Vdd supply */
+#define SD_VMMC_MAX_LOAD_UA	800000
+
+/* Max load for SD Vdd-io supply */
+#define SD_VQMMC_MAX_LOAD_UA	22000
+>>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
 
 #define msm_host_readl(msm_host, host, offset) \
 	msm_host->var_ops->msm_readl_relaxed(host, offset)
@@ -1779,6 +1787,7 @@ static int sdhci_msm_set_pincfg(struct sdhci_msm_host *msm_host, bool level)
 	return ret;
 }
 
+<<<<<<< HEAD
 static int sdhci_msm_dt_parse_hsr_info(struct device *dev,
 		struct sdhci_msm_host *msm_host)
 
@@ -1900,9 +1909,49 @@ out:
 }
 
 static int sdhci_msm_set_vmmc(struct mmc_host *mmc)
+=======
+static void msm_config_vmmc_regulator(struct mmc_host *mmc, bool hpm)
+{
+	int load;
+
+	if (!hpm)
+		load = 0;
+	else if (!mmc->card)
+		load = max(MMC_VMMC_MAX_LOAD_UA, SD_VMMC_MAX_LOAD_UA);
+	else if (mmc_card_mmc(mmc->card))
+		load = MMC_VMMC_MAX_LOAD_UA;
+	else if (mmc_card_sd(mmc->card))
+		load = SD_VMMC_MAX_LOAD_UA;
+	else
+		return;
+
+	regulator_set_load(mmc->supply.vmmc, load);
+}
+
+static void msm_config_vqmmc_regulator(struct mmc_host *mmc, bool hpm)
+{
+	int load;
+
+	if (!hpm)
+		load = 0;
+	else if (!mmc->card)
+		load = max(MMC_VQMMC_MAX_LOAD_UA, SD_VQMMC_MAX_LOAD_UA);
+	else if (mmc_card_sd(mmc->card))
+		load = SD_VQMMC_MAX_LOAD_UA;
+	else
+		return;
+
+	regulator_set_load(mmc->supply.vqmmc, load);
+}
+
+static int sdhci_msm_set_vmmc(struct sdhci_msm_host *msm_host,
+			      struct mmc_host *mmc, bool hpm)
+>>>>>>> 266f523db5be6cf93b3a2c4f58251dfa65768e35
 {
 	if (IS_ERR(mmc->supply.vmmc))
 		return 0;
+
+	msm_config_vmmc_regulator(mmc, hpm);
 
 	return mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, mmc->ios.vdd);
 }
@@ -1915,6 +1964,8 @@ static int msm_toggle_vqmmc(struct sdhci_msm_host *msm_host,
 
 	if (msm_host->vqmmc_enabled == level)
 		return 0;
+
+	msm_config_vqmmc_regulator(mmc, level);
 
 	if (level) {
 		/* Set the IO voltage regulator to default voltage level */
@@ -2589,7 +2640,8 @@ static void sdhci_msm_handle_pwr_irq(struct sdhci_host *host, int irq)
 	}
 
 	if (pwr_state) {
-		ret = sdhci_msm_set_vmmc(mmc);
+		ret = sdhci_msm_set_vmmc(msm_host, mmc,
+					 pwr_state & REQ_BUS_ON);
 		if (!ret)
 			ret = sdhci_msm_set_vqmmc(msm_host, mmc,
 					pwr_state & REQ_BUS_ON);
@@ -4381,9 +4433,6 @@ static void mmc_cache_card(struct mmc_host *mmc)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
 
-	if (msm_host->is_partial_init_broken)
-		return;
-
 	memcpy(&msm_host->cached_ios, &mmc->ios, sizeof(msm_host->cached_ios));
 	mmc_cache_card_ext_csd(mmc);
 }
@@ -4396,12 +4445,6 @@ static int mmc_can_sleep(struct mmc_card *card)
 static int mmc_partial_init(struct mmc_host *mmc)
 {
 	int err = 0;
-	struct sdhci_host *shost = mmc_priv(mmc);
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(shost);
-	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
-
-	if (msm_host->is_partial_init_broken)
-		return -EOPNOTSUPP;
 
 	if (mmc_can_sleep(mmc->card)) {
 		err = mmc_sleepawake(mmc);
@@ -5470,9 +5513,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 
 	if (of_property_read_bool(node, "is_rumi"))
 		sdhci_msm_set_rumi_bus_mode(host);
-
-	msm_host->is_partial_init_broken =
-		of_property_read_bool(dev->of_node, "qcom,no-partial-init");
 
 	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
 	dev_dbg(&pdev->dev, "Host Version: 0x%x Vendor Version 0x%x\n",
