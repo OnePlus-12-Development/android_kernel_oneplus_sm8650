@@ -197,10 +197,6 @@ source "drivers/input/rmi4/Kconfig"
 #ifdef OPLUS_FEATURE_UFF_FINGERPRINT
 source "drivers/input/uff_fp_drivers/Kconfig"
 #endif /* OPLUS_FEATURE_UFF_FINGERPRINT */
-
-#ifdef OPLUS_SECURE_COMMON
-source "drivers/input/oplus_secure_drivers/Kconfig"
-#endif /* OPLUS_SECURE_COMMON */
  
 endif
 

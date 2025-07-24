@@ -487,13 +487,6 @@ config QCOM_SMP2P
 	help
 	  Say yes here to support the Qualcomm Shared Memory Point to Point
 	  protocol.
-
-config OPLUS_FEATURE_SMP2P_STATS
-	bool "Qualcomm Shared Memory Point to Point statistics"
-	default y
-	help
-		Say yes here to support the Qualcomm Shared Memory Point to Point
-		statistics.
  
 config QCOM_SMSM
 	tristate "Qualcomm Shared Memory State Machine"

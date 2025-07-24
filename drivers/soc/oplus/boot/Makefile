@@ -3,5 +3,4 @@
 
 obj-y += cmdline_parser/
 obj-y += oplus_projectinfo/
-obj-y += oplus_phoenix/
 obj-y += bootmode/

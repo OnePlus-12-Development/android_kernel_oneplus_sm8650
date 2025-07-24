@@ -30,11 +30,6 @@
 #endif
 #endif /* OPLUS_ARCH_EXTENDS */
 
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-/* Add for switch mode err */
-#include <soc/oplus/system/oplus_mm_kevent_fb.h>
-#endif
-
 #define FSA4480_I2C_NAME	"fsa4480-driver"
 
 #ifdef OPLUS_ARCH_EXTENDS
@@ -884,10 +879,6 @@ int fsa4480_switch_event(struct device_node *node,
 	#ifdef OPLUS_ARCH_EXTENDS
 	/* Add record plugin status */
 	unsigned int setting_reg_val = 0, control_reg_val = 0;
-	#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-	/* Add for switch mode err */
-	char buf[MM_KEVENT_MAX_PAYLOAD_SIZE] = {0};
-	#endif /* CONFIG_OPLUS_FEATURE_MM_FEEDBACK */
 	#endif /* OPLUS_ARCH_EXTENDS */
 
 	if (!client)
@@ -913,12 +904,6 @@ int fsa4480_switch_event(struct device_node *node,
 			regmap_read(fsa_priv->regmap, FSA4480_SWITCH_CONTROL, &control_reg_val);
 			pr_err("%s: error mode, reg[0x%x]=0x%x, reg[0x%x]=0x%x\n", __func__,
 					FSA4480_SWITCH_SETTINGS, setting_reg_val, FSA4480_SWITCH_CONTROL, control_reg_val);
-			#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-			/* Add for switch mode err */
-			scnprintf(buf, sizeof(buf) - 1, "func@@%s$$typec_mode@@%d$$regs@@0x%x,0x%x", \
-					__func__, fsa_priv->usbc_mode.counter, setting_reg_val, control_reg_val);
-			upload_mm_fb_kevent_to_atlas_limit(OPLUS_AUDIO_EVENTID_HEADSET_DET, buf, MM_FB_KEY_RATELIMIT_5MIN);
-			#endif /* CONFIG_OPLUS_FEATURE_MM_FEEDBACK */
 			break;
 		}
 		#endif /* OPLUS_ARCH_EXTENDS */

@@ -64,9 +64,6 @@ struct wcd_usbss_ctxt {
 	struct notifier_block chg_nb;
 	bool chg_registration;
 #endif
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-	bool sdam_handler;
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
 };
 
 #ifdef OPLUS_FEATURE_CHG_BASIC

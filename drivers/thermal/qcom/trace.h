@@ -49,4 +49,3 @@ TRACE_EVENT(bcl_stat,
 /* This part must be outside protection */
 #include <trace/define_trace.h>
 
-

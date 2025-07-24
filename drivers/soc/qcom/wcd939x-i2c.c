@@ -19,9 +19,6 @@
 #include "wcd-usbss-priv.h"
 #include "wcd-usbss-reg-masks.h"
 #include "wcd-usbss-reg-shifts.h"
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-#include <soc/oplus/system/oplus_mm_kevent_fb.h>
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
 //#ifdef OPLUS_ARCH_EXTENDS
 /* Add for avoiding ADSP notify wcd to switch to standy mode in the ftm mode */
 #include <soc/oplus/system/boot_mode.h>
@@ -163,13 +160,6 @@ static int acquire_runtime_env(struct wcd_usbss_ctxt *priv)
 				priv->runtime_env_counter);
 		priv->runtime_env_counter = 0;
 	}
-
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-	if ((rc < 0) && !(priv->sdam_handler && (rc == -EACCES))) {
-		mm_fb_audio_kevent_named(OPLUS_AUDIO_EVENTID_HEADSET_DET, MM_FB_KEY_RATELIMIT_5MIN, \
-			"pm_runtime_resume_and_get failed rc %d", rc);
-	}
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
 
 	mutex_unlock(&priv->runtime_env_counter_lock);
 
@@ -707,12 +697,6 @@ static int wcd_usbss_surge_kthread_fn(void *p)
 					cancel_delayed_work_sync(&wcd_usbss_ctxt_->check_surge_delaywork);
 				}
 				wcd_usbss_reset_routine();
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-				if (!(wcd_usbss_ctxt_->cable_status & (BIT(WCD_USBSS_USB)))) {
-					mm_fb_audio_kevent_named(OPLUS_AUDIO_EVENTID_HEADSET_DET, MM_FB_KEY_RATELIMIT_5MIN, \
-					"payload@@negative surge occurs, cable_status = %d", wcd_usbss_ctxt_->cable_status);
-				}
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
 			}
 
 			release_runtime_env(wcd_usbss_ctxt_);
@@ -776,10 +760,6 @@ static void wcd_usbss_check_surge_work_fn(struct work_struct *work)
 			if(wcd_usbss_is_in_reset_state()) {
 				pr_err("%s: the surge event occurs, reset usbss\n", __func__);
 				wcd_usbss_reset_routine();
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-				mm_fb_audio_kevent_named(OPLUS_AUDIO_EVENTID_HEADSET_DET, MM_FB_KEY_RATELIMIT_5MIN, \
-					"payload@@usbss surge occurs, cable_status = %d", priv->cable_status);
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
 			}
 			release_runtime_env(wcd_usbss_ctxt_);
 		}
@@ -1655,16 +1635,6 @@ int wcd_usbss_switch_update(enum wcd_usbss_cable_types ctype,
 						BIT(WCD_USBSS_GND_MIC_SWAP_AATC) |
 						BIT(WCD_USBSS_HSJ_CONNECT) |
 						BIT(WCD_USBSS_GND_MIC_SWAP_HSJ)))) {
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-			if (wcd_usbss_ctxt_->cable_status & (BIT(WCD_USBSS_USB) |
-							BIT(WCD_USBSS_DP_AUX_CC1) |
-							BIT(WCD_USBSS_DP_AUX_CC2) |
-							BIT(WCD_USBSS_CHARGER))) {
-				dev_err(wcd_usbss_ctxt_->dev, "error state 0x%x\n", wcd_usbss_ctxt_->cable_status);
-				mm_fb_audio_kevent_named(OPLUS_AUDIO_EVENTID_HEADSET_DET, MM_FB_KEY_RATELIMIT_5MIN, \
-					"payload@@wcd_usbss_switch_update error state 0x%x", wcd_usbss_ctxt_->cable_status);
-			}
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
 			wcd_usbss_ctxt_->wcd_standby_status = WCD_USBSS_AUDIO_MODE_SET;
 			dev_dbg(wcd_usbss_ctxt_->dev, "wcd state transition to %s complete\n",
 					status_to_str(wcd_usbss_ctxt_->wcd_standby_status));
@@ -1957,9 +1927,6 @@ static irqreturn_t wcd_usbss_sdam_notifier_handler(int irq, void *data)
 //#endif /* OPLUS_ARCH_EXTENDS */
 
 	mutex_lock(&wcd_usbss_ctxt_->switch_update_lock);
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-	priv->sdam_handler = true;
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
 	if (buf[0] == priv->wcd_standby_status) {
 		dev_info(priv->dev, "%s: wcd already in %s mode:\n", __func__,
 				status_to_str(priv->wcd_standby_status));
@@ -2000,9 +1967,6 @@ static irqreturn_t wcd_usbss_sdam_notifier_handler(int irq, void *data)
 release_runtime:
 	release_runtime_env(wcd_usbss_ctxt_);
 unlock_mutex:
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-	priv->sdam_handler = false;
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
 	mutex_unlock(&wcd_usbss_ctxt_->switch_update_lock);
 	kfree(buf);
 	return IRQ_HANDLED;
@@ -2015,9 +1979,6 @@ static int wcd_usbss_sdam_registration(struct wcd_usbss_ctxt *priv)
 	if (!priv)
 		return -EINVAL;
 
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-	priv->sdam_handler = false;
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
 	priv->wcd_standby_status = WCD_USBSS_USB_MODE_SET;
 	priv->nvmem_cell = devm_nvmem_cell_get(priv->dev, "usb_mode");
 	if (IS_ERR(priv->nvmem_cell)) {
@@ -2207,10 +2168,6 @@ static int wcd_usbss_probe(struct i2c_client *i2c)
 		dev_err(priv->dev, "%s: ucsi glink notifier registration failed: %d\n",
 			__func__, rc);
 		rc = 0;
-		#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-		mm_fb_audio_kevent_named(OPLUS_AUDIO_EVENTID_HEADSET_DET, MM_FB_KEY_RATELIMIT_30MIN, \
-			"charge glink notifier registration failed");
-		#endif /* CONFIG_OPLUS_FEATURE_MM_FEEDBACK */
 	} else {
 		mutex_init(&priv->noti_lock);
 		priv->chg_registration = true;
@@ -2259,14 +2216,9 @@ static void wcd_usbss_remove(struct i2c_client *i2c)
 		return;
 
 	error = pm_runtime_resume_and_get(priv->dev);
-	if (error < 0) {
+	if (error < 0)
 		dev_err(priv->dev, "%s: pm_runtime_resume_and_get failed: %i\n",
 				__func__, error);
-//#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-		mm_fb_audio_kevent_named(OPLUS_AUDIO_EVENTID_HEADSET_DET, MM_FB_KEY_RATELIMIT_5MIN, \
-			"pm_runtime_resume_and_get failed: %i", error);
-//#endif /*CONFIG_OPLUS_FEATURE_MM_FEEDBACK*/
-	}
 
 	wcd_usbss_disable_surge_kthread();
 	unregister_ucsi_glink_notifier(&priv->ucsi_nb);

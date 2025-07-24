@@ -34,14 +34,6 @@ obj-$(CONFIG_ARCH_U8500)	+= ux500/
 obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
 obj-y				+= xilinx/
 
-#ifdef OPLUS_FEATURE_MM_FEEDBACK
-obj-$(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)	+= oplus/multimedia/
-#endif /* OPLUS_FEATURE_MM_FEEDBACK */
-
-#ifdef OPLUS_TRACKPOINT_REPORT
-obj-$(CONFIG_OPLUS_TRACKPOINT_REPORT)	+= oplus/trackpoint/
-#endif /* OPLUS_TRACKPOINT_REPORT */
-
 #ifdef OPLUS_FEATURE_TP_BASIC
 obj-$(CONFIG_OPLUS_DEVICE_IFNO)  +=  oplus/device_info/
 #endif /* OPLUS_FEATURE_TP_BASIC */
@@ -59,13 +51,3 @@ obj-y += oplus/boot/
 #ifdef OPLUS_FEATURE_DFR
 obj-y += oplus/dfr/
 #endif /* OPLUS_FEATURE_DFR */
-
-#ifdef OPLUS_FEATURE_MODEM_MINIDUMP
-obj-$(CONFIG_OPLUS_FEATURE_RECORD_MDMRST)     += oplus/mdmrst/
-#endif /*OPLUS_FEATURE_MODEM_MINIDUMP*/
-
-#ifdef OPLUS_FEATURE_MDMFEATURE
-obj-$(CONFIG_OPLUS_FEATURE_MDMFEATURE)     += oplus/mdmfeature/
-#endif /*OPLUS_FEATURE_MDMFEATURE*/
-
-obj-y += oplus/storage/

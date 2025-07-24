@@ -125,9 +125,3 @@ config QCOM_DMABUF_HEAPS_SYSTEM_MOVABLE
 	  works in tandem with the system-movable driver to be able to
 	  lend memory from the movable zone.
 	  If in doubt, say N here.
-
-config OPLUS_FEATURE_MM_BOOSTPOOL
-	bool "Oplus DMA-BUF heaps boost-pool library"
-	depends on QCOM_DMABUF_HEAPS && QCOM_DMABUF_HEAPS_SYSTEM
-	help
-	  Choose this option to enable the DMA-BUF heaps boost-pool library.

@@ -35,11 +35,4 @@ oplus_bsp_tp_common-y += touchpanel_tui_support/touchpanel_tui_support.o
 obj-$(CONFIG_TOUCHPANEL_NOTIFY) += oplus_bsp_tp_notify.o
 
 obj-$(CONFIG_TOUCHPANEL_SYNAPTICS) += Synaptics/
-obj-$(CONFIG_TOUCHPANEL_FOCAL) += Focal/
-obj-$(CONFIG_TOUCHPANEL_GOODIX) += Goodix/
 obj-$(CONFIG_TOUCHPANEL_NOVA) += Novatek/
-obj-$(CONFIG_TOUCHPANEL_HIMAX) += Himax/
-obj-$(CONFIG_TOUCHPANEL_SAMSUNG) += Samsung/
-obj-$(CONFIG_TOUCHPANEL_ILITEK) += ilitek/
-obj-$(CONFIG_TOUCHPANEL_JADARD) += Jadard/
-obj-$(CONFIG_TOUCHPANEL_ST) += St/
