@@ -68,3 +68,8 @@ obj-$(CONFIG_QSEECOM_PROXY) 	+= qseecom_proxy.o
 obj-$(CONFIG_QCOM_SMCI_PROXY) 	+= smci_proxy.o
 obj-$(CONFIG_BOOTMARKER_PROXY) 	+= bootmarker_proxy.o
 obj-$(CONFIG_KINECTICS_XR_NORDIC) += kxrctrl/
+#ifdef OPLUS_FEATURE_CHG_BASIC
+obj-$(CONFIG_AW8697_HAPTIC) += vibrator/aw8697_haptic/
+obj-$(CONFIG_SIH_VIBRATOR) += vibrator/si_haptic/
+#endif
+obj-$(CONFIG_OPLUS_POWER_NOTIFIER) += oplus_power_notifier/

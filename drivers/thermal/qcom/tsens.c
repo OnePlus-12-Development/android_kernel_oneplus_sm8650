@@ -689,6 +689,7 @@ get_temp:
 			s->tzd->type, temp);
 
 dump_and_exit:
+	if (*temp < 60000) return 0;
 	if (s->tzd)
 		TSENS_DBG(priv, "Sensor_id: %d name:%s temp: %d",
 				hw_id, s->tzd->type, *temp);
@@ -849,9 +850,12 @@ static int init_cold_interrupt(struct tsens_priv *priv,
 						priv->fields[COLD_STATUS]);
 		if (IS_ERR(priv->rf[COLD_STATUS])) {
 			ret = PTR_ERR(priv->rf[COLD_STATUS]);
+			goto err_put_device;
 		}
 	}
 
+err_put_device:
+	put_device(&op->dev);
 	return ret;
 }
 

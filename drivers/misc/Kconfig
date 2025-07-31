@@ -539,6 +539,18 @@ config KINECTICS_XR_NORDIC
 	   this also parses the gpios and interrupts from device tree and sets
 	   the gpios and interrupt handler for handling the interrupt.
 
+#ifdef OPLUS_FEATURE_CHG_BASIC
+config HAPTIC_FEEDBACK
+	tristate "Haptic driver feedback"
+	help
+	  This option enables support for Haptic Driver Feedback.
+
+config OPLUS_VIBRATOR_GKI_ENABLE
+	tristate "vibrator compatibility"
+	help
+	  This option enables support for vibrator compatibility.
+#endif
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
@@ -558,4 +570,7 @@ source "drivers/misc/isl97900_led/Kconfig"
 source "drivers/misc/uacce/Kconfig"
 source "drivers/misc/pvpanic/Kconfig"
 source "drivers/misc/mchp_pci1xxxx/Kconfig"
+source "drivers/misc/vibrator/aw8697_haptic/Kconfig"
+source "drivers/misc/vibrator/si_haptic/Kconfig"
+source "drivers/misc/oplus_power_notifier/Kconfig"
 endmenu

@@ -1576,7 +1576,9 @@ static void handle_uaudio_stream_req(struct qmi_handle *handle,
 
 	if (!subs) {
 		uaudio_err("invalid substream\n");
+#ifdef OPLUS_FEATURE_CHG_BASIC
 		ret = -EINVAL;
+#endif
 		goto response;
 	}
 
