@@ -2223,7 +2223,10 @@ static ssize_t proc_disable_touch_event_write(struct file *file, const char __us
 
 	TP_INFO(ts->tp_index, "%s: write value=%d\n", __func__,
 		disable_touch_event);
+	mutex_lock(&ts->mutex);
+	ts->ts_ops->mode_switch(ts->chip_data, MODE_UNDERWATER, disable_touch_event > 0);
 	ts->disable_touch_event = disable_touch_event;
+	mutex_unlock(&ts->mutex);
 
 	return count;
 }

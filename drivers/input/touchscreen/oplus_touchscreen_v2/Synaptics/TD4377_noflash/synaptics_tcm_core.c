@@ -849,6 +849,19 @@ static int syna_parse_report(struct syna_tcm_hcd *tcm_hcd)
 			touch_data->glove_status = data;
 			offset += bits;
 			break;
+		case TOUCH_GET_WATER_MODE:
+			bits = config_data[idx++];
+			retval = syna_get_report_data(tcm_hcd, offset, bits, &data);
+			if (retval < 0) {
+				if (tcm_hcd->health_monitor_support) {
+					tp_healthinfo_report(tcm_hcd->monitor_data, HEALTH_REPORT, "parse_report_err_nsmstate");
+				}
+				TPD_INFO("Failed to get NSM state\n");
+				return retval;
+			}
+			touch_data->water_mode = data;
+			offset += bits;
+			break;
 		case TOUCH_NUM_OF_ACTIVE_OBJECTS:
 			bits = config_data[idx++];
 			retval = syna_get_report_data(tcm_hcd, offset, bits, &data);
@@ -1000,7 +1013,7 @@ static int syna_set_normal_report_config(struct syna_tcm_hcd *tcm_hcd)
 	unsigned int idx = 0;
 	unsigned int length;
 	struct touch_hcd *touch_hcd = tcm_hcd->touch_hcd;
-
+	struct touchpanel_data *ts = spi_get_drvdata(tcm_hcd->s_client);
 	TPD_INFO("%s:set normal report\n", __func__);
 	length = le2_to_uint(tcm_hcd->app_info.max_touch_report_config_size);
 
@@ -1032,6 +1045,10 @@ static int syna_set_normal_report_config(struct syna_tcm_hcd *tcm_hcd)
 	touch_hcd->out.buf[idx++] = 8;
 	touch_hcd->out.buf[idx++] = TOUCH_REPORT_PALM_DETECTED;
 	touch_hcd->out.buf[idx++] = 8;
+	if (ts->waterproof_support) {
+	touch_hcd->out.buf[idx++] = TOUCH_GET_WATER_MODE;
+	touch_hcd->out.buf[idx++] = 8;
+	}
 	touch_hcd->out.buf[idx++] = TOUCH_FOREACH_ACTIVE_OBJECT;
 	touch_hcd->out.buf[idx++] = TOUCH_OBJECT_N_INDEX;
 	touch_hcd->out.buf[idx++] = 4;
@@ -1314,7 +1331,7 @@ static void syna_tcm_dispatch_report(struct syna_tcm_hcd *tcm_hcd)
 		syna_tcm_test_report(tcm_hcd);
 		TPD_INFO("syna_tcm_test_report\n");
 	}
-
+	TPD_DEBUG("%s: glove_mode =%d\n", __func__, touch_data->glove_status);
 exit:
 	UNLOCK_BUFFER(tcm_hcd->report.buffer);
 	UNLOCK_BUFFER(tcm_hcd->in);
@@ -3326,14 +3343,27 @@ static int syna_mode_switch(void *chip_data, work_mode mode, int flag)
 {
 	int ret = 0;
 	struct syna_tcm_hcd *tcm_hcd = (struct syna_tcm_hcd *)chip_data;
-
+	struct touchpanel_data *ts = spi_get_drvdata(tcm_hcd->s_client);
 	if(!tcm_hcd->tp_irq_state) {
 		TPD_INFO("tp irq disabled, skip switch mode.\n");
 		return 0;
 	}
-
-	msleep(100);
-	tp_wait_hdl_finished();
+	if (ts != NULL) {
+		if (ts->is_suspended == 0) {
+			if (ts->incell_aod_gesture_support) {
+				if (MODE_INCELL_AOD == mode) {
+					TPD_INFO("enter aod mode switch\n");
+					atomic_set(&tcm_hcd->host_downloading, 0);
+					/*syna_tcm_hdl_done(tcm_hcd);*/
+					enable_irq(tcm_hcd->s_client->irq);
+					/*g_tcm_hcd->hdl_finished_flag = 1;*/
+					complete(&tcm_hcd->config_complete);
+				}
+			}
+			msleep(100);
+			tp_wait_hdl_finished();
+		}
+	}
 
 	TPD_INFO("syna_mode_switch begin, mode = %d\n", mode);
 	switch (mode) {
@@ -3398,6 +3428,12 @@ static int syna_mode_switch(void *chip_data, work_mode mode, int flag)
 		ret = synaptics_enable_edge_limit(tcm_hcd, flag);
 		if (ret < 0) {
 			TPD_INFO("%s: synaptics enable edg limit failed.\n", __func__);
+		}
+		break;
+	case MODE_UNDERWATER:
+		ret = syna_tcm_set_dynamic_config(tcm_hcd, DC_UNDER_WATER, flag?1:0);
+		if (ret < 0) {
+			TPD_INFO("%s:failed to set under_water mode\n", __func__);
 		}
 		break;
 	default:
@@ -3909,7 +3945,7 @@ static int synaptics_auto_test_preoperation(struct seq_file *s, void *chip_data,
 	char *p_node = NULL;
 	char *postfix = "_TEST.img";
 	uint8_t copy_len = 0;
-
+	ts->lpwg_fw_support = false;
 	TPD_INFO("%s  is called\n", __func__);
 
 	fw_name_test = kzalloc(MAX_FW_NAME_LENGTH, GFP_KERNEL);
@@ -3969,7 +4005,7 @@ static int synaptics_auto_black_screen_test_endoperation(struct seq_file *s, voi
 	const struct firmware *fw = NULL;
 
 	TPD_INFO("%s  is called\n", __func__);
-
+	ts->lpwg_fw_support = true;
 	ret = request_firmware(&fw, ts->panel_data.fw_name, ts->dev);
 	if (!ret) {
 		ts->loading_fw = true;
@@ -5130,6 +5166,75 @@ static void syna_getglove_mode_status(void *chip_data, int *enable, int *count)
 	return;
 }
 
+static void syna_force_water_mode(void *chip_data, bool enable)
+{
+	TPD_INFO("%s: %s force_water_mode is not supported .\n", __func__, enable ? "Enter" : "Exit");
+}
+
+static void syna_read_water_flag(void *chip_data)
+{
+	struct syna_tcm_hcd *tcm_hcd = (struct syna_tcm_hcd *)chip_data;
+	struct touchpanel_data *ts = spi_get_drvdata(tcm_hcd->s_client);
+	struct touch_hcd *touch_hcd = tcm_hcd->touch_hcd;
+	struct touch_data *touch_data = &touch_hcd->touch_data;
+
+	TP_INFO(touch_data->water_mode, "%s: water flag.\n", __func__);
+	TPD_INFO("water_mode = %d \n", touch_data->water_mode);
+	if (touch_data->water_mode == 1) {
+		ts->water_mode = 1;
+	} else {
+		ts->water_mode = 0;
+	}
+}
+static int syna_tcm_diaphragm_touch_lv_set(void *chip_data, int level)
+{
+	struct syna_tcm_hcd *tcm_info = (struct syna_tcm_hcd *)chip_data;
+	unsigned short regval = 0;
+	int retval = 0;
+
+	retval = syna_tcm_get_dynamic_config(tcm_info, DC_LOW_TEMP_ENABLE, &regval);
+	if (retval < 0) {
+		TPD_INFO("Failed to get diaphragm_touch config\n");
+		return 0;
+	}
+
+	switch (level) {
+	case DIAPHRAGM_DEFAULT_MODE:
+		regval = 0xfcff & regval;
+		break;
+	case DIAPHRAGM_FILM_MODE:
+		regval = 0xfcff & regval;
+		regval = 0x0100 | regval;
+		break;
+	case DIAPHRAGM_WATERPROO_MODE:
+		regval = 0xfcff & regval;
+		regval = 0x0200 | regval;
+		break;
+	case DIAPHRAGM_FILM_WATERPROO_MODE:
+		regval = 0xfcff & regval;
+		regval = 0x0200 | regval;
+		break;
+	default:
+		TPD_INFO("error, level = %d", level);
+		return 0;
+	}
+
+	retval = syna_tcm_set_dynamic_config(tcm_info, DC_LOW_TEMP_ENABLE, regval);
+	if (retval < 0) {
+		TPD_INFO("Failed to set diaphragm_touch config\n");
+		return 0;
+	}
+
+	retval = syna_tcm_get_dynamic_config(tcm_info, DC_LOW_TEMP_ENABLE, &regval);
+	if (retval < 0) {
+		TPD_INFO("Failed to get diaphragm_touch config\n");
+		return 0;
+	}
+	TPD_INFO("diaphragm_touch_lv_set level = %d regval = %d", level, regval);
+
+	return 0;
+}
+
 static struct oplus_touchpanel_operations syna_tcm_ops = {
 	.ftm_process       = syna_ftm_process,
 	.get_vendor        = syna_get_vendor,
@@ -5152,10 +5257,13 @@ static struct oplus_touchpanel_operations syna_tcm_ops = {
 	.set_touch_direction    = synaptics_set_touch_direction,
 	.get_touch_direction    = synaptics_get_touch_direction,
 	.rate_white_list_ctrl   = syna_rate_white_list_ctrl,
+	.get_water_mode         = syna_read_water_flag,
+	.force_water_mode       = syna_force_water_mode,
 /*	.freq_hop_trigger = syna_freq_hop_trigger,*/
 	.smooth_lv_set    = syna_tcm_smooth_lv_set,
 	.sensitive_lv_set = syna_tcm_sensitive_lv_set,
 	.get_glove_mode         = syna_getglove_mode_status,
+	.diaphragm_touch_lv_set    = syna_tcm_diaphragm_touch_lv_set,
 };
 
 /*

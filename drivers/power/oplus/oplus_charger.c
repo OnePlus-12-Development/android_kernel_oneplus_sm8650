@@ -11000,14 +11000,16 @@ void monitor_ui_soc_to_enable_chg_up_limit(struct oplus_chg_chip *chip)
 			over_count = 0;
 			oplus_enforce_chg_up_limit_result(chip, true);
 			return;
-		} else if (chip->ui_soc == chg_up_limit_data.charge_limit_value) {
+		} else if (chip->ui_soc == chg_up_limit_data.charge_limit_value &&
+			chg_up_limit_data.charge_limit_value < OPLUS_FULL_SOC) {
 			over_count++;
 			if (over_count >= CHG_UP_DELAY_COUNT) {
 				over_count = CHG_UP_DELAY_COUNT;
 				oplus_enforce_chg_up_limit_result(chip, true);
 			}
 			return;
-		} else if (chip->ui_soc >= chg_up_limit_data.charge_limit_recharge_value) {
+		} else if (chip->ui_soc >= chg_up_limit_data.charge_limit_recharge_value &&
+			chg_up_limit_data.charge_limit_recharge_value < OPLUS_FULL_SOC) {
 			over_count = 0;
 			return;
 		} else {

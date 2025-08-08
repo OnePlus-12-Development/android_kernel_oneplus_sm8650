@@ -7431,7 +7431,7 @@ static int oplus_chg_8350_set_curr_level(struct oplus_chg_ic_dev *ic_dev, int co
 	return rc;
 }
 
-int oplus_adsp_voocphy_set_cool_down(int cool_down)
+int oplus_adsp_voocphy_set_cool_down(int cool_down, int curr_ma)
 {
 	int rc = 0;
 	struct battery_chg_dev *bcdev = g_bcdev;
@@ -7443,11 +7443,12 @@ int oplus_adsp_voocphy_set_cool_down(int cool_down)
 	}
 	pst = &bcdev->psy_list[PSY_TYPE_BATTERY];
 
-	rc = write_property_id(bcdev, pst, BATT_SET_COOL_DOWN, cool_down);
+	rc = write_property_id(bcdev, pst, BATT_SET_COOL_DOWN,
+		(cool_down & 0xff) | ((curr_ma & 0xffff) << 16));
 	if (rc < 0)
 		chg_err("write cool down fail, rc=%d\n", rc);
 	else
-		chg_info("set cool down to %d, rc=%d\n", cool_down, rc);
+		chg_info("set cool down to %d, curr to %dma, rc=%d\n", cool_down, curr_ma, rc);
 
 	return rc;
 }

@@ -229,6 +229,7 @@ typedef enum {
 	MODE_WATERPROOF,
 	MODE_LEATHER_COVER,
 	MODE_INCELL_AOD,
+	MODE_UNDERWATER,
 } work_mode;
 
 typedef enum {

@@ -303,9 +303,9 @@ void operate_mode_switch(struct touchpanel_data *ts)
 				TP_INFO(ts->tp_index, "%s : incell_aod_flag = %d", __func__, ts->incell_aod_flag);
 				if (ts->incell_aod_flag) {
 					TP_INFO(ts->tp_index, "TP in mode aod start\n");
-					ts->is_suspended = 1;
 					ts->incell_aod_flag = false;
 					mode_switch_health(ts,  MODE_INCELL_AOD, true);
+					ts->is_suspended = 1;
 				} else {
 					TP_INFO(ts->tp_index, "TP out mode aod start\n");
 					mode_switch_health(ts,  MODE_INCELL_AOD, false);
@@ -365,7 +365,10 @@ void operate_mode_switch(struct touchpanel_data *ts)
 		if (ts->waterproof_support) {
 			mode_switch_health(ts, MODE_WATERPROOF, ts->waterproof & ~(0x1 << WATERPROOF_RUS_BIT));
 		}
-
+		if (ts->disable_touch_event_support) {
+			mode_switch_health(ts, MODE_UNDERWATER, ts->disable_touch_event);
+			TP_INFO(ts->tp_index, "%s:ODE_UNDERWATER success: disable_touch_event = %d\n", __func__, ts->disable_touch_event);
+		}
 		mode_switch_health(ts, MODE_NORMAL, true);
 	}
 }
@@ -4880,6 +4883,10 @@ static void speedup_resume(struct work_struct *work)
 	if(ts->fp_disable_after_resume && ts->fp_quick_start_data == 1) {
 		ts->fp_quick_start_data = 0;
 		ts->fp_enable = 0;
+	}
+
+	if (ts->incell_aod_gesture_support) {
+		ts->is_suspended = 0;
 	}
 
 	operate_mode_switch(ts);

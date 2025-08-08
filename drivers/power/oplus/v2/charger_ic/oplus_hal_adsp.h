@@ -777,7 +777,7 @@ int oplus_adsp_voocphy_reset_again(void);
 int oplus_adsp_batt_curve_current(void);
 void oplus_chg_set_match_temp_ui_soc_to_voocphy(void);
 void oplus_chg_set_ap_fastchg_allow_to_voocphy(int allow);
-int oplus_adsp_voocphy_set_cool_down(int cool_down);
+int oplus_adsp_voocphy_set_cool_down(int cool_down, int curr_ma);
 int oplus_adsp_voocphy_get_bcc_max_current(void);
 int oplus_adsp_voocphy_get_bcc_min_current(void);
 int oplus_adsp_voocphy_get_atl_last_geat_current(void);
