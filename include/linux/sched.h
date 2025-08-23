@@ -70,6 +70,7 @@ struct seq_file;
 struct sighand_struct;
 struct signal_struct;
 struct task_delay_info;
+struct task_dma_buf_info;
 struct task_group;
 
 /*
@@ -1026,6 +1027,7 @@ struct task_struct {
 	int __user			*clear_child_tid;
 
 	/* PF_KTHREAD | PF_IO_WORKER */
+	/* Otherwise used as task_dma_buf_info pointer */
 	void				*worker_private;
 
 	u64				utime;
