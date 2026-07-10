@@ -33,6 +33,7 @@ static struct {
 	struct kthread_worker kworker;
 	struct kthread_work work;
 	struct task_struct *task;
+	void (*saved_data_ready)(struct sock *sk);
 	int local_node;
 } qrtr_ns;
 
@@ -773,10 +774,14 @@ int qrtr_ns_init(void)
 		goto err_sock;
 	}
 
+<<<<<<< HEAD
 	/* OPLUS_FEATURE_CAMERA_COMMON begin */
 	sched_set_fifo_low(qrtr_ns.task);
 	/* OPLUS_FEATURE_CAMERA_COMMON end */
 
+=======
+	qrtr_ns.saved_data_ready = qrtr_ns.sock->sk->sk_data_ready;
+>>>>>>> 898e2f3024c4ecc01434e5701a4a2ca5ecb95a01
 	qrtr_ns.sock->sk->sk_data_ready = qrtr_ns_data_ready;
 
 	sq.sq_port = QRTR_PORT_CTRL;
@@ -820,6 +825,10 @@ int qrtr_ns_init(void)
 	return 0;
 
 err_wq:
+	write_lock_bh(&qrtr_ns.sock->sk->sk_callback_lock);
+	qrtr_ns.sock->sk->sk_data_ready = qrtr_ns.saved_data_ready;
+	write_unlock_bh(&qrtr_ns.sock->sk->sk_callback_lock);
+
 	kthread_stop(qrtr_ns.task);
 err_sock:
 	sock_release(qrtr_ns.sock);
@@ -829,7 +838,12 @@ EXPORT_SYMBOL_GPL(qrtr_ns_init);
 
 void qrtr_ns_remove(void)
 {
+	write_lock_bh(&qrtr_ns.sock->sk->sk_callback_lock);
+	qrtr_ns.sock->sk->sk_data_ready = qrtr_ns.saved_data_ready;
+	write_unlock_bh(&qrtr_ns.sock->sk->sk_callback_lock);
+
 	kthread_flush_worker(&qrtr_ns.kworker);
+	synchronize_net();
 	kthread_stop(qrtr_ns.task);
 
 	/* sock_release() expects the two references that were put during
